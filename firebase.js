@@ -3,8 +3,7 @@ import {
   collection, addDoc, deleteDoc, doc,
   onSnapshot, query, orderBy, setDoc, getDoc
 } from "firebase/firestore";
-import { db } from "./firebase";
-
+import { db } from "./firebaseConfig";
 // ── Palette ────────────────────────────────────────────────────────────────
 const C = {
   bg: "#0d1117", surface: "#161b22", card: "#1c2230", border: "#2d3748",
