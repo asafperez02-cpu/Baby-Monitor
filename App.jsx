@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <meta name="theme-color" content="#0d1117" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>👶 Baby Monitor</title>
+  <style>
+    body { margin: 0; background: #0d1117; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>
