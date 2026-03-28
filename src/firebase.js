@@ -1,7 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { 
+  getFirestore, 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager 
+} from "firebase/firestore";
 
-// הגדרות ה-Firebase שימשכו את המשתנים שהזנת ב-Vercel
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -11,8 +15,9 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// אתחול האפליקציה
 const app = initializeApp(firebaseConfig);
 
-// ייצוא מסד הנתונים לשימוש בשאר חלקי האפליקציה
-export const db = getFirestore(app);
+// הגדרה שגורמת לאפליקציה לזכור הכל מקומית ולעלות מיד
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
