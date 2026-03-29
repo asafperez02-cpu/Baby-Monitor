@@ -121,10 +121,16 @@ export default function BabyApp() {
   const saveState = useCallback(async (patch) => {
     await setDoc(doc(db, "state", "global"), patch, { merge: true });
   }, []);
-const clean = Object.fromEntries(Object.entries({ ts: Date.now(), user: userName, ...ev }).filter(([_, v]) => v !== undefined));
-await addDoc(collection(db, "events"), clean);
-  const addEvent = useCallback(async (ev) => {
-
+await addDoc(collection(db, "events"), { ts: Date.now(), user: userName, ...ev });await addDoc(collection(db, "events"), clean);
+  const addEvent = useCallback(async (ev) => {onDiaperConfirm={async (data) => {onDiaperConfirm={async (data) => {
+  const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await addEvent({ type: "diaper", ...clean });
+  setModal(null);
+}}
+  const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await addEvent({ type: "diaper", ...clean });
+  setModal(null);
+}}
   }, [userName]);
 
   const deleteEvent = useCallback(async (id) => {
@@ -220,7 +226,11 @@ await addDoc(collection(db, "events"), clean);
               await addEvent({ type: "feed", feedType: feeding.feedType, side: feeding.side, ml: feeding.ml, duration: dur });
               await saveState({ feeding: null });
             }}
-            onDiaperConfirm={async (data) => {
+            onDiaperConfirm={async (data) => {onDiaperConfirm={async (data) => {
+  const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await addEvent({ type: "diaper", ...clean });
+  setModal(null);
+}}
               await addEvent({ type: "diaper", ...data });
               setModal(null);
             }}
@@ -334,7 +344,15 @@ function HomeTab({ events, lastFeed, lastDiaper, sleeping, feeding, now, todaySl
 
       {/* Modals */}
       {modal === "feed" && <FeedModal onConfirm={onFeedConfirm} onClose={() => setModal(null)} />}
-      {modal === "diaper" && <DiaperModal onConfirm={onDiaperConfirm} onClose={() => setModal(null)} />}
+      {modal === "diaper" && <DiaperModal onConfirm={onDiaperConfirm} onClose={() => setModal(null)} />} onDiaperConfirm={async (data) => {onDiaperConfirm={async (data) => {
+  const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await addEvent({ type: "diaper", ...clean });
+  setModal(null);
+}}
+  const clean = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await addEvent({ type: "diaper", ...clean });
+  setModal(null);
+}}
       {modal === "note" && <NoteModal onConfirm={onNoteConfirm} onClose={() => setModal(null)} />}
     </div>
   );
