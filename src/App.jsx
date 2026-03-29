@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+                                                                                                       import { useState, useEffect, useCallback } from "react";
 import {
   collection, addDoc, deleteDoc, doc,
   onSnapshot, query, orderBy, setDoc, getDoc
@@ -64,7 +64,7 @@ export default function BabyApp() {
   const [events, setEvents] = useState([]);
   const [tab, setTab] = useState("home");
   const [userName, setUserName] = useState(() => localStorage.getItem("baby_username") || "");
-  const [babyName, setBabyName] = useState("התינוקת");
+  const [babyName, setBabyName] = useState("עלמה");
   const [setup, setSetup] = useState(!localStorage.getItem("baby_username"));
   const [sleeping, setSleeping] = useState(null);
   const [feeding, setFeeding] = useState(null);
@@ -152,6 +152,7 @@ export default function BabyApp() {
   });
   const todaySleepMs = todayEvents.filter(e => e.type === "sleep_end" && e.duration).reduce((s, e) => s + e.duration, 0);
   const todayMl = todayEvents.filter(e => e.type === "feed" && e.ml).reduce((s, e) => s + Number(e.ml || 0), 0);
+  const diapersTodayCount = todayEvents.filter(e => e.type === "diaper").length;
 
   return (
     <div style={S.app}>
@@ -180,7 +181,7 @@ export default function BabyApp() {
           <HomeTab
             events={events} lastFeed={lastFeed} lastDiaper={lastDiaper}
             sleeping={sleeping} feeding={feeding} now={now}
-            todaySleepMs={todaySleepMs} todayMl={todayMl}
+            todaySleepMs={todaySleepMs} todayMl={todayMl} diapersTodayCount={diapersTodayCount}
             userName={userName} modal={modal} setModal={setModal}
             onStartSleep={async () => {
               await saveState({ sleeping: { ts: Date.now(), user: userName } });
@@ -227,8 +228,10 @@ export default function BabyApp() {
   );
 }
 
-// ── Components ─────────────────────────────────────────────────────────────
-function HomeTab({ events, lastFeed, lastDiaper, sleeping, feeding, now, todaySleepMs, todayMl, modal, setModal, onStartSleep, onEndSleep, onFeedConfirm, onEndFeed, onDiaperConfirm, onNoteConfirm, onDelete }) {
+// ── Home Tab ───────────────────────────────────────────────────────────────
+function HomeTab({ events, lastFeed, lastDiaper, sleeping, feeding, now, todaySleepMs, todayMl, diapersTodayCount, modal, setModal, onStartSleep, onEndSleep, onFeedConfirm, onEndFeed, onDiaperConfirm, onNoteConfirm, onDelete }) {
+  const lastFeedInterval = lastFeed ? elapsed(now - lastFeed.ts) : null;
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <div style={S.card}>
@@ -240,21 +243,32 @@ function HomeTab({ events, lastFeed, lastDiaper, sleeping, feeding, now, todaySl
           <Stat label="נוזלים היום" value={todayMl ? `${todayMl} מ"ל` : "—"} color={C.mint} />
         </div>
       </div>
+
       <div style={S.card}>
         <div style={S.cardTitle}>⚡ פעולה מהירה</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <BigBtn icon="🍼" label={feeding ? "סיים האכלה" : "האכלה"} sub={feeding ? elapsed(now - feeding.ts) : "לחץ להתחיל"} color={C.accent} onClick={() => feeding ? onEndFeed() : setModal("feed")} />
-          <BigBtn icon={sleeping ? "☀️" : "😴"} label={sleeping ? "קמה!" : "לישון"} sub={sleeping ? elapsed(now - sleeping.ts) : "לחץ לתיעוד"} color={C.lavender} onClick={() => sleeping ? onEndSleep() : onStartSleep()} />
-          <BigBtn icon="🧷" label="חיתול" sub="פיפי / קקי" color={C.pink} onClick={() => setModal("diaper")} />
-          <BigBtn icon="📝" label="הערה" sub="אירוע חופשי" color={C.yellow} onClick={() => setModal("note")} />
+          <BigBtn 
+            icon="🍼" label={feeding ? "סיים האכלה" : "האכלה"} 
+            sub={feeding ? `אוכלת ${elapsed(now - feeding.ts)}` : `היום: ${todayMl}מ"ל | לפני: ${lastFeedInterval || '—'}`} 
+            color={C.accent} onClick={() => feeding ? onEndFeed() : setModal("feed")} 
+          />
+          <BigBtn 
+            icon={sleeping ? "☀️" : "😴"} label={sleeping ? "קמה!" : "לישון"} 
+            sub={sleeping ? `יושנת ${elapsed(now - sleeping.ts)}` : `סה"כ היום: ${todaySleepMs ? elapsed(todaySleepMs) : '0 דק'}`} 
+            color={C.lavender} onClick={() => sleeping ? onEndSleep() : onStartSleep()} 
+          />
+          <BigBtn icon="🧷" label="חיתול" sub={`החלפתם ${diapersTodayCount} פעמים היום`} color={C.pink} onClick={() => setModal("diaper")} />
+          <BigBtn icon="📝" label="הערה" sub="תיעוד חופשי" color={C.yellow} onClick={() => setModal("note")} />
         </div>
       </div>
+
       <div style={S.card}>
         <div style={S.cardTitle}>⏱ אחרונים</div>
         {events.slice(0, 8).map((e, idx) => (
           <EventRow key={e.id} ev={e} allEvents={events} index={idx} onDelete={() => onDelete(e.id)} />
         ))}
       </div>
+
       {modal === "feed" && <FeedModal onConfirm={onFeedConfirm} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={onDiaperConfirm} onClose={() => setModal(null)} />}
       {modal === "note" && <NoteModal onConfirm={onNoteConfirm} onClose={() => setModal(null)} />}
@@ -262,6 +276,7 @@ function HomeTab({ events, lastFeed, lastDiaper, sleeping, feeding, now, todaySl
   );
 }
 
+// ── Other Shared Components ────────────────────────────────────────────────
 function HistoryTab({ events, onDelete, now }) {
   const days = groupByDay(events);
   return (
@@ -295,29 +310,24 @@ function StatsTab({ events, now }) {
 
 function EventRow({ ev, allEvents, index, onDelete }) {
   const icons = { feed: "🍼", feed_start: "🍼", sleep_start: "😴", sleep_end: "☀️", diaper: "🧷", note: "📝" };
-  
-  // לוגיקת חישוב מרווח האכלה
   let interval = null;
   if (ev.type === "feed") {
     const prevFeed = allEvents.slice(index + 1).find(p => p.type === "feed");
-    if (prevFeed) {
-      interval = elapsed(ev.ts - prevFeed.ts);
-    }
+    if (prevFeed) interval = elapsed(ev.ts - prevFeed.ts);
   }
 
   return (
-    <div style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}`, position: "relative" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+    <div style={{ padding: "12px 0", borderBottom: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", justifyContent: "space-between" }}>
         <div>
           <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
             {icons[ev.type]} {fmt(ev.ts)} 
             {ev.ml && <span style={{ marginRight: 8, color: C.accentDark }}>{ev.ml} מ"ל</span>}
           </div>
-          {interval && <div style={{ fontSize: 11, color: C.accentDark, fontWeight: 600 }}>⏱ מרווח: {interval}</div>}
-          {ev.type === "diaper" && <div style={{ fontSize: 11, color: C.muted }}>{ev.pee ? "פיפי " : ""}{ev.poop ? "קקי" : ""}</div>}
-          {ev.note && <div style={{ fontSize: 12, color: C.textSoft, marginTop: 2, fontStyle: "italic" }}>"{ev.note}"</div>}
+          {interval && <div style={{ fontSize: 11, color: C.accentDark }}>⏱ מרווח: {interval}</div>}
+          {ev.note && <div style={{ fontSize: 12, color: C.textSoft }}>{ev.note}</div>}
         </div>
-        <button onClick={onDelete} style={{ background: "none", border: "none", fontSize: 14, cursor: "pointer", opacity: 0.4 }}>🗑️</button>
+        <button onClick={onDelete} style={{ background: "none", border: "none", opacity: 0.3 }}>🗑️</button>
       </div>
     </div>
   );
@@ -341,7 +351,7 @@ function SetupScreen({ onDone }) {
         <>
           <div style={{ color: C.text, fontSize: 22, fontWeight: 800 }}>שם התינוקת?</div>
           <input value={bname} onChange={e => setBname(e.target.value)} placeholder="שם..." style={S.input} />
-          <button onClick={() => onDone(uname, bname || "התינוקת")} style={S.primaryBtn}>בואו נתחיל!</button>
+          <button onClick={() => onDone(uname, bname || "עלמה")} style={S.primaryBtn}>בואו נתחיל!</button>
         </>
       )}
     </div>
@@ -350,14 +360,10 @@ function SetupScreen({ onDone }) {
 
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("90");
-  const [note, setNote] = useState("");
   return (
     <Modal title="🍼 האכלה" onClose={onClose}>
-      <div style={{ marginBottom: 10 }}>כמות (מ"ל):</div>
-      <input type="number" value={ml} onChange={e => setMl(e.target.value)} style={S.input} />
-      <div style={{ marginBottom: 10 }}>הערה:</div>
-      <input value={note} onChange={e => setNote(e.target.value)} style={S.input} placeholder="אופציונלי..." />
-      <button onClick={() => onConfirm({ type: "feed", ml, note })} style={S.primaryBtn}>שמור ארוחה</button>
+      <input type="number" value={ml} onChange={e => setMl(e.target.value)} style={S.input} placeholder='מ"ל' />
+      <button onClick={() => onConfirm({ type: "feed", ml })} style={S.primaryBtn}>שמור</button>
     </Modal>
   );
 }
@@ -392,7 +398,7 @@ function Modal({ title, children, onClose }) {
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 15 }}>
           <div style={{ fontWeight: 800 }}>{title}</div>
-          <button onClick={onClose} style={{ border: "none", background: "none", fontSize: 18 }}>✕</button>
+          <button onClick={onClose} style={{ border: "none", background: "none" }}>✕</button>
         </div>
         {children}
       </div>
@@ -402,19 +408,19 @@ function Modal({ title, children, onClose }) {
 
 function Stat({ label, value }) {
   return (
-    <div style={{ flex: "1 1 40%", minWidth: 80 }}>
+    <div style={{ flex: "1 1 40%" }}>
       <div style={{ fontSize: 11, color: C.muted }}>{label}</div>
-      <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{value}</div>
+      <div style={{ fontSize: 15, fontWeight: 700 }}>{value}</div>
     </div>
   );
 }
 
 function BigBtn({ icon, label, sub, color, onClick }) {
   return (
-    <button onClick={onClick} style={{ background: color + "20", border: `1px solid ${color}60`, borderRadius: 18, padding: "12px 8px", cursor: "pointer", textAlign: "center", transition: "transform 0.1s" }}>
+    <button onClick={onClick} style={{ background: color + "20", border: `1px solid ${color}60`, borderRadius: 18, padding: "12px 8px", cursor: "pointer", textAlign: "center" }}>
       <div style={{ fontSize: 24 }}>{icon}</div>
       <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{label}</div>
-      <div style={{ fontSize: 9, color: C.muted }}>{sub}</div>
+      <div style={{ fontSize: 9, color: C.muted, marginTop: 4 }}>{sub}</div>
     </button>
   );
 }
@@ -424,14 +430,14 @@ const S = {
   header: { background: C.white, padding: "12px 15px", display: "flex", justifyContent: "space-between", borderBottom: `1px solid ${C.border}`, position: "sticky", top: 0, zIndex: 10 },
   content: { padding: 15, paddingBottom: 85 },
   card: { background: C.white, borderRadius: 18, padding: 15, marginBottom: 15, border: `1px solid ${C.border}`, boxShadow: `0 2px 8px ${C.shadow}` },
-  cardTitle: { fontSize: 11, color: C.muted, marginBottom: 12, fontWeight: 600, letterSpacing: 0.5 },
+  cardTitle: { fontSize: 11, color: C.muted, marginBottom: 12, fontWeight: 600 },
   nav: { position: "fixed", bottom: 0, width: "100%", maxWidth: 480, background: C.white, display: "flex", justifyContent: "space-around", padding: "8px 0", borderTop: `1px solid ${C.border}`, zIndex: 10 },
-  navBtn: (active) => ({ background: "none", border: "none", padding: "5px 15px", borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center", gap: 2 }),
-  primaryBtn: { background: C.accent, color: C.white, border: "none", padding: 14, borderRadius: 14, width: "100%", fontWeight: 700, cursor: "pointer", fontSize: 16 },
-  input: { width: "100%", padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, marginBottom: 15, background: C.bg, fontSize: 16 },
-  chip: (a) => ({ background: a ? C.accent : C.bg, color: a ? "white" : C.text, border: "none", padding: "10px 18px", borderRadius: 12, marginLeft: 8, fontWeight: 600, fontSize: 14 }),
+  navBtn: (active) => ({ background: "none", border: "none", padding: "5px 15px", borderRadius: 12, display: "flex", flexDirection: "column", alignItems: "center" }),
+  primaryBtn: { background: C.accent, color: C.white, border: "none", padding: 14, borderRadius: 14, width: "100%", fontWeight: 700, cursor: "pointer" },
+  input: { width: "100%", padding: 12, borderRadius: 12, border: `1px solid ${C.border}`, marginBottom: 15, background: C.bg },
+  chip: (a) => ({ background: a ? C.accent : C.bg, color: a ? "white" : C.text, border: "none", padding: "10px 18px", borderRadius: 12, marginLeft: 8, fontWeight: 600 }),
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000 },
   modal: { background: "white", padding: 20, borderRadius: "24px 24px 0 0", width: "100%", maxWidth: 480 },
   center: { display: "flex", alignItems: "center", justifyContent: "center" },
-  badge: (bg, c) => ({ background: bg, color: c, padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700 })
+  badge: (bg, c) => ({ background: bg + "60", color: c, padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 700 })
 };
