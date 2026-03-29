@@ -393,9 +393,9 @@ function HomeTab({
       <div style={{ ...S.card, background: `linear-gradient(135deg, ${C.pinkLight}, ${C.peachLight})`, border: `1.5px solid ${C.border}` }}>
         <div style={S.cardTitle}>✨ סיכום היום</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-          <SummaryCard icon="🍼" title="האכלות" value={`${todayFeeds.length} פעמים`} sub={todayMl ? `${todayMl} מ"ל סה"כ` : "ללא כמות"} color={C.peach} />
-          <SummaryCard icon="🧷" title="חיתולים" value={`💧${todayPee} 💩${todayPoop}`} sub={`סה"כ ${todayPee + todayPoop}`} color={C.pink} warn={noPoopAlert} />
-          <SummaryCard icon="😴" title="שינה" value={todaySleepMs ? elapsed(todaySleepMs) : "—"} sub={sleeping ? "ישנה כרגע" : "סה"כ היום"} color={C.lavender} />
+          <SummaryCard icon="🍼" title="האכלות" value={`${todayFeeds.length} פעמים`} sub={todayMl ? `${todayMl} מל סהכ` : "ללא כמות"} color={C.peach} />
+          <SummaryCard icon="🧷" title="חיתולים" value={`💧${todayPee} 💩${todayPoop}`} sub={`סהכ ${todayPee + todayPoop}`} color={C.pink} warn={noPoopAlert} />
+          <SummaryCard icon="😴" title="שינה" value={todaySleepMs ? elapsed(todaySleepMs) : "—"} sub={sleeping ? "ישנה כרגע" : "סהכ היום"} color={C.lavender} />
           <SummaryCard icon="🌟" title="זמן ערות" value={todayFeeds.length > 0 ? elapsed(Math.min(todayAwakeMs, 86400000)) : "—"} sub="מתחילת היום" color={C.mint} />
         </div>
       </div>
