@@ -121,9 +121,10 @@ export default function BabyApp() {
   const saveState = useCallback(async (patch) => {
     await setDoc(doc(db, "state", "global"), patch, { merge: true });
   }, []);
-
+const clean = Object.fromEntries(Object.entries({ ts: Date.now(), user: userName, ...ev }).filter(([_, v]) => v !== undefined));
+await addDoc(collection(db, "events"), clean);
   const addEvent = useCallback(async (ev) => {
-    await addDoc(collection(db, "events"), { ts: Date.now(), user: userName, ...ev });
+
   }, [userName]);
 
   const deleteEvent = useCallback(async (id) => {
