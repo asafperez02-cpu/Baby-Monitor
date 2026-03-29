@@ -1,23 +1,14 @@
 import { initializeApp } from "firebase/app";
-import { 
-  getFirestore, 
-  initializeFirestore, 
-  persistentLocalCache, 
-  persistentMultipleTabManager 
-} from "firebase/firestore";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyDrjTKgdOoPxV18vbVxImfy7rBqnxQfcYY",
+  authDomain: "baby-monitor-57bb9.firebaseapp.com",
+  projectId: "baby-monitor-57bb9",
+  storageBucket: "baby-monitor-57bb9.firebasestorage.app",
+  messagingSenderId: "143290491509",
+  appId: "1:143290491509:web:352c1e25b01c7bde710e3c"
 };
 
 const app = initializeApp(firebaseConfig);
-
-// הגדרה שגורמת לאפליקציה לזכור הכל מקומית ולעלות מיד
-export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
-});
+export const db = getFirestore(app);
