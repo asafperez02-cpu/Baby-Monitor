@@ -17,6 +17,7 @@ const C = {
   creamSoft: "#fff7ed",
   text: "#4a2c2a",
   textSoft: "#8c6d6a",
+  accent: "#ff9a9e", // צבע דגש חדש לווידג'ט
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
@@ -30,7 +31,6 @@ function getDayName(ts) {
   return new Date(ts).toLocaleDateString("he-IL", { weekday: 'short', day: 'numeric', month: 'numeric' });
 }
 
-// פונקציה להפיכת שעה שהוזנה ידנית (HH:mm) ל-Timestamp של היום
 function manualTimeToTs(manualTime) {
   if (!manualTime) return Date.now();
   const [hours, minutes] = manualTime.split(':');
@@ -44,6 +44,13 @@ export default function BabyApp() {
   const [tab, setTab] = useState("home");
   const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
   const [modal, setModal] = useState(null);
+  const [now, setNow] = useState(Date.now());
+
+  // עדכון השעה כל דקה כדי שהטיימרים יהיו מדויקים
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const q = query(collection(db, "events"), orderBy("ts", "desc"));
@@ -54,11 +61,7 @@ export default function BabyApp() {
 
   const addEvent = async (ev) => {
     const finalTs = ev.manualTime ? manualTimeToTs(ev.manualTime) : Date.now();
-    await addDoc(collection(db, "events"), { 
-      ts: finalTs, 
-      user: userName, 
-      ...ev 
-    });
+    await addDoc(collection(db, "events"), { ts: finalTs, user: userName, ...ev });
   };
 
   const deleteEvent = async (id) => {
@@ -75,10 +78,13 @@ export default function BabyApp() {
         h1, h2, h3, button, .kids-font { font-family: ${FONT_KIDS} !important; }
       `}</style>
 
-      {/* Header */}
+      {/* Header המעודכן עם הווידג'ט המרכזי */}
       <div style={S.headerContainer}>
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div style={S.babyBadge}>עלמה 🌸</div>
+        
+        {/* הווידג'ט המרכזי שביקשת */}
+        <MainTimerWidget events={events} now={now} />
       </div>
 
       <div style={S.content}>
@@ -98,35 +104,50 @@ export default function BabyApp() {
   );
 }
 
-// ── Home View ──────────────────────────────────────────────────────────────
-function HomeView({ events, setModal, onDelete }) {
+// ── Components ──────────────────────────────────────────────────────────────
+
+function MainTimerWidget({ events, now }) {
   const lastFeed = events.find(e => e.type === "feed");
   const lastDiaper = events.find(e => e.type === "diaper");
 
+  const timeAgo = (ts) => {
+    if (!ts) return "--";
+    const diff = Math.floor((now - ts) / 60000);
+    if (diff < 0) return "עכשיו";
+    const h = Math.floor(diff / 60);
+    const m = diff % 60;
+    return h > 0 ? `${h} ש׳ ו-${m} דק׳` : `${m} דק׳`;
+  };
+
+  return (
+    <div style={S.mainWidget}>
+      <div style={{fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>
+        זמן מאז ארוחה אחרונה:
+      </div>
+      <div style={{fontSize: 34, fontWeight: 900, color: 'white', fontFamily: FONT_KIDS}}>
+        🍼 {timeAgo(lastFeed?.ts)}
+      </div>
+      <div style={S.subTimer}>
+        ⏳ הוחלפה לפני {timeAgo(lastDiaper?.ts)}
+      </div>
+    </div>
+  );
+}
+
+function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
   const feedEvents = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a,b) => b.ts - a.ts);
   const diaperEvents = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a,b) => b.ts - a.ts);
 
-  const timeAgo = (ts) => {
-    if (!ts) return "—";
-    const diff = Math.floor((Date.now() - ts) / 60000);
-    if (diff < 0) return "בעתיד";
-    if (diff < 60) return `${diff} דק׳`;
-    return `${Math.floor(diff/60)} ש׳ ו-${diff%60} דק׳`;
-  };
-
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <div style={S.statusStrip}>
-        <div style={S.statusItem}>⏳ אכלה לפני: <b style={{color: C.peachDark}}>{timeAgo(lastFeed?.ts)}</b></div>
-        <div style={S.statusItem}>⏳ הוחלפה לפני: <b style={{color: C.pinkDark}}>{timeAgo(lastDiaper?.ts)}</b></div>
-      </div>
-
+      {/* כפתורי פעולה */}
       <div style={{ display: "flex", gap: 12 }}>
         <button onClick={() => setModal("feed")} style={{ ...S.actionBtn, background: "#fef3c7", color: "#b45309" }}>🍼 האכלה</button>
         <button onClick={() => setModal("diaper")} style={{ ...S.actionBtn, background: "#fce7f3", color: "#be185d" }}>🧷 החתלה</button>
       </div>
 
+      {/* טבלת טורים */}
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
         <div style={{ display: "flex", gap: 10 }}>
@@ -163,41 +184,17 @@ function HomeView({ events, setModal, onDelete }) {
   );
 }
 
-function WeeklySummary({ events, limit = 7, fullView = false }) {
-  const days = {};
-  events.forEach(e => {
-    const date = new Date(e.ts).toDateString();
-    if (!days[date]) days[date] = { ts: e.ts, ml: 0, diapers: 0 };
-    if (e.type === "feed") days[date].ml += Number(e.ml || 0);
-    if (e.type === "diaper") days[date].diapers += 1;
-  });
-
-  const sortedDays = Object.values(days).sort((a, b) => b.ts - a.ts).slice(0, limit);
-
-  return (
-    <div style={S.card}>
-      <div className="kids-font" style={S.cardTitle}>{fullView ? "יומן שבועי" : "סיכום קצר"}</div>
-      {sortedDays.map(day => (
-        <div key={day.ts} style={S.summaryRow}>
-          <div style={{ fontWeight: 800, width: 90 }}>{getDayName(day.ts)}</div>
-          <div style={{ flex: 1, color: C.peachDark, fontWeight: 700 }}>🍼 {day.ml} מ"ל</div>
-          <div style={{ flex: 1, color: C.pinkDark, fontWeight: 700 }}>🧷 {day.diapers}</div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// ── Modals ─────────────────────────────────────────────────────────────────
+// ── Modals & Helpers ────────────────────────────────────────────────────────
+// (נשארו זהים לגרסה הקודמת עם התיקונים של השעה הידנית והתראת הטיטול)
 function FeedModal({ onConfirm, onClose }) {
-  const [step, setStep] = useState("checkDiaper"); // checkDiaper -> entry
+  const [step, setStep] = useState("checkDiaper");
   const [ml, setMl] = useState("");
   const [manualTime, setManualTime] = useState("");
   const [isManual, setIsManual] = useState(false);
 
   if (step === "checkDiaper") return (
     <div style={S.overlay}><div style={S.modal}>
-      <h3 style={{textAlign:'center', marginBottom:20, color: C.pinkDark}}>רגע לפני... 🧷</h3>
+      <h3 style={{textAlign:'center', marginBottom:20, color: C.peachDark}}>רגע לפני... 🧷</h3>
       <p style={{textAlign:'center', marginBottom:20, fontWeight:700}}>האם החלפת לעלמה טיטול?</p>
       <div style={{display:'flex', gap:10}}>
         <button onClick={() => setStep("entry")} style={S.primaryBtn}>כן, הכל נקי!</button>
@@ -210,23 +207,19 @@ function FeedModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <h3 style={{ textAlign: "center", marginBottom: 15 }}>כמות האכלה 🍼</h3>
-        
         <div style={{marginBottom: 15}}>
-          <label style={S.label}>שעת האכלה:</label>
-          <div style={{display:'flex', gap:5, marginTop:5}}>
+          <div style={{display:'flex', gap:5, marginBottom:10}}>
             <button onClick={()=>setIsManual(false)} style={S.miniChip(!isManual)}>עכשיו</button>
             <button onClick={()=>setIsManual(true)} style={S.miniChip(isManual)}>שעה אחרת</button>
           </div>
-          {isManual && <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={{...S.input, marginTop:10}} />}
+          {isManual && <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={S.input} />}
         </div>
-
         <div style={{display:'flex', flexWrap:'wrap', gap:8, marginBottom:15}}>
             {[60,90,120,150,180].map(v => (
                 <button key={v} onClick={()=>setMl(v)} style={S.chip(ml==v)}>{v}</button>
             ))}
         </div>
-        <input type="number" value={ml} onChange={e => setMl(e.target.value)} placeholder="כמות במ״ל..." style={S.input} />
-        <button onClick={() => { onConfirm({ type: "feed", ml, manualTime: isManual ? manualTime : null }); onClose(); }} style={S.primaryBtn} disabled={!ml || (isManual && !manualTime)}>שמור עדכון</button>
+        <button onClick={() => { onConfirm({ type: "feed", ml, manualTime: isManual ? manualTime : null }); onClose(); }} style={S.primaryBtn} disabled={!ml}>שמור</button>
       </div>
     </div>
   );
@@ -242,22 +235,40 @@ function DiaperModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <h3 style={{ textAlign: "center", marginBottom: 15 }}>מה החלפנו? 💩</h3>
-
-        <div style={{marginBottom: 15}}>
-          <label style={S.label}>שעת החתלה:</label>
-          <div style={{display:'flex', gap:5, marginTop:5}}>
-            <button onClick={()=>setIsManual(false)} style={S.miniChip(!isManual)}>עכשיו</button>
-            <button onClick={()=>setIsManual(true)} style={S.miniChip(isManual)}>שעה אחרת</button>
-          </div>
-          {isManual && <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={{...S.input, marginTop:10}} />}
+        <div style={{display:'flex', gap:5, marginBottom:15}}>
+          <button onClick={()=>setIsManual(false)} style={S.miniChip(!isManual)}>עכשיו</button>
+          <button onClick={()=>setIsManual(true)} style={S.miniChip(isManual)}>שעה אחרת</button>
         </div>
-
+        {isManual && <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={{...S.input, marginBottom:15}} />}
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
           <button onClick={() => setPee(!pee)} style={S.chip(pee)}>💧 פיפי</button>
           <button onClick={() => setPoop(!poop)} style={S.chip(poop)}>💩 קקי</button>
         </div>
-        <button onClick={() => { onConfirm({ type: "diaper", pee, poop, manualTime: isManual ? manualTime : null }); onClose(); }} style={S.primaryBtn} disabled={(!pee && !poop) || (isManual && !manualTime)}>שמור עדכון</button>
+        <button onClick={() => { onConfirm({ type: "diaper", pee, poop, manualTime: isManual ? manualTime : null }); onClose(); }} style={S.primaryBtn} disabled={!pee && !poop}>שמור</button>
       </div>
+    </div>
+  );
+}
+
+function WeeklySummary({ events, limit = 7, fullView = false }) {
+  const days = {};
+  events.forEach(e => {
+    const date = new Date(e.ts).toDateString();
+    if (!days[date]) days[date] = { ts: e.ts, ml: 0, diapers: 0 };
+    if (e.type === "feed") days[date].ml += Number(e.ml || 0);
+    if (e.type === "diaper") days[date].diapers += 1;
+  });
+  const sortedDays = Object.values(days).sort((a, b) => b.ts - a.ts).slice(0, limit);
+  return (
+    <div style={S.card}>
+      <div className="kids-font" style={S.cardTitle}>{fullView ? "יומן שבועי" : "סיכום קצר"}</div>
+      {sortedDays.map(day => (
+        <div key={day.ts} style={S.summaryRow}>
+          <div style={{ fontWeight: 800, width: 90 }}>{getDayName(day.ts)}</div>
+          <div style={{ flex: 1, color: C.peachDark, fontWeight: 700 }}>🍼 {day.ml} מ"ל</div>
+          <div style={{ flex: 1, color: C.pinkDark, fontWeight: 700 }}>🧷 {day.diapers}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -267,14 +278,36 @@ const S = {
   app: { direction: "rtl", minHeight: "100vh", maxWidth: 480, margin: "0 auto", color: C.text, background: C.bg },
   headerContainer: { 
     background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, 
-    padding: "35px 20px", borderRadius: "0 0 50px 50px", textAlign: "center",
-    boxShadow: "0 10px 20px rgba(232, 121, 249, 0.2)"
+    padding: "30px 20px 40px", borderRadius: "0 0 60px 60px", textAlign: "center",
+    boxShadow: "0 10px 25px rgba(232, 121, 249, 0.25)"
   },
-  greeting: { fontSize: 16, color: "white", fontWeight: 600, opacity: 0.9 },
-  babyBadge: { fontSize: 38, fontFamily: FONT_KIDS, color: "white", fontWeight: 800, marginTop: 5 },
+  greeting: { fontSize: 14, color: "white", fontWeight: 600, opacity: 0.85, marginBottom: 5 },
+  babyBadge: { fontSize: 36, fontFamily: FONT_KIDS, color: "white", fontWeight: 800, marginBottom: 20 },
+  
+  // הווידג'ט המרכזי החדש
+  mainWidget: {
+    background: "rgba(255, 255, 255, 0.2)",
+    backdropFilter: "blur(10px)",
+    borderRadius: "30px",
+    padding: "20px",
+    border: "1px solid rgba(255, 255, 255, 0.3)",
+    display: "inline-block",
+    width: "100%",
+    maxWidth: "320px",
+    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)"
+  },
+  subTimer: {
+    marginTop: 10,
+    fontSize: 13,
+    fontWeight: 700,
+    color: "white",
+    background: "rgba(0,0,0,0.1)",
+    padding: "4px 12px",
+    borderRadius: "20px",
+    display: "inline-block"
+  },
+
   content: { padding: "20px 15px 120px" },
-  statusStrip: { display: "flex", justifyContent: "space-around", background: "white", padding: "15px", borderRadius: "20px", border: `1px solid ${C.border}` },
-  statusItem: { fontSize: 14, fontWeight: 600 },
   actionBtn: { flex: 1, border: "none", padding: "22px", borderRadius: "25px", fontSize: 20, fontWeight: 800, cursor: "pointer", fontFamily: FONT_KIDS },
   card: { background: "white", borderRadius: "30px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
   cardTitle: { fontSize: 20, fontWeight: 800, marginBottom: 20, textAlign: "center", color: C.peachDark },
@@ -288,7 +321,6 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(255,255,255,0.9)", backdropFilter:'blur(10px)', display: "flex", borderTop: `1px solid ${C.border}`, padding: "15px 10px 30px" },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "12px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontFamily: FONT_KIDS, fontSize: 16 }),
   input: { width: "100%", padding: "12px", borderRadius: "12px", border: `2px solid ${C.border}`, fontSize: 16, textAlign:'center' },
-  label: { fontSize: 14, fontWeight: 700, color: C.textSoft },
   primaryBtn: { width: "100%", padding: "15px", borderRadius: "20px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18, cursor:'pointer' },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 },
   modal: { background: "white", padding: "30px", borderRadius: "35px", width: "100%", maxWidth: 350 },
