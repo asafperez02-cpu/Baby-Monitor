@@ -1,19 +1,16 @@
 {
-  "short_name": "עלמה",
-  "name": "עלמה - מעקב תינוקת",
-  "description": "אפליקציית מעקב עבור עלמה",
+  "short_name": "המעקב של אלה",
+  "name": "המעקב של אלה",
+  "start_url": ".",
+  "display": "browser",
+  "background_color": "#F5F5F5",
+  "theme_color": "#F5F5F5",
   "icons": [
     {
-      "src": "logo.svg",
+      "src": "icon.svg",
+      "sizes": "any",
       "type": "image/svg+xml",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
-  ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#f4a58a",
-  "background_color": "#fffcfb",
-  "orientation": "portrait",
-  "lang": "he"
+  ]
 }
