@@ -4,7 +4,19 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>המעקב של עלמה</title>
+    
     <link rel="stylesheet" href="style.css">
+    
+    <style>
+        body { font-family: sans-serif; text-align: center; background-color: white; }
+        #app { max-width: 600px; margin: auto; padding: 20px; }
+        h1 { font-weight: bold; font-size: 2em; }
+        .main-container { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+        button { padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 1.1em; }
+        .feed-btn { background-color: #ffcccc; color: #cc6666; }
+        .diaper-btn { background-color: #ccccff; color: #6666cc; }
+        .test-btn { background-color: rgba(224, 236, 255, 1); color: #007bff; margin-top: 20px; text-decoration: underline; border: none; background: none; }
+    </style>
 </head>
 <body>
 
@@ -16,47 +28,40 @@
         </ul>
     </nav>
 
-    <div id="app" style="padding: 20px; text-align: center;">
-        <h1>המעקב של עלמה 👶</h1>
+    <div id="app">
+        <div class="main-container">
+            <span class="emoji">👶</span>
+            <span class="main-title">המעקב של עלמה</span>
+        </div>
         
-        <div id="tracker-content">
-            <p>הזן נתוני האכלה או החתלה:</p>
-            </div>
-
+        <p>הזן נתוני האכלה או החתלה:</p>
+        
         <hr>
-        <button class="test-btn" onclick="testFeatures()" style="padding: 10px; margin-top: 20px;">
-            בדוק רטט והתראות
-        </button>
+        
+        <div class="tracker-buttons">
+            <button class="feed-btn" onclick="addFeed()">🍼 האכלה</button>
+            <button class="diaper-btn" onclick="addDiaper()">🧷 החתלה</button>
+        </div>
+
+        <button class="test-btn" onclick="testFeatures()">בדוק רטט והתראות</button>
     </div>
 
     <script src="script.js"></script>
     <script>
-        // 1. ביטול ה-Service Worker (PWA)
+        // זהו החלק של ביטול PWA ורטט שדיברנו עליו קודם
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
                     registration.unregister();
-                    console.log("PWA Service Worker removed.");
                 }
             });
         }
 
-        // 2. פונקציית רטט והתראות
         function testFeatures() {
-            // רטט
-            if (navigator.vibrate) {
-                navigator.vibrate([100, 50, 100]); // רטט מקוטע
-            }
-            
-            // התראות
+            if (navigator.vibrate) navigator.vibrate(200);
             if ("Notification" in window) {
                 Notification.requestPermission().then(permission => {
-                    if (permission === "granted") {
-                        new Notification("התראות פעילות!", {
-                            body: "עכשיו האתר יתריע גם בלי להיות PWA",
-                            icon: "icon.png"
-                        });
-                    }
+                    if (permission === "granted") new Notification("הבדיקה הצליחה!");
                 });
             }
         }
