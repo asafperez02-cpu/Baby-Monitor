@@ -1,27 +1,21 @@
 {
   "short_name": "עלמה",
   "name": "עלמה - מעקב תינוקת",
-  "description": "אפליקציית מעקב האכלות והחתלות עבור עלמה",
   "icons": [
     {
       "src": "logo192.png",
       "type": "image/png",
-      "sizes": "192x192",
-      "purpose": "any maskable"
+      "sizes": "192x192"
     },
     {
       "src": "logo512.png",
       "type": "image/png",
-      "sizes": "512x512",
-      "purpose": "any maskable"
+      "sizes": "512x512"
     }
   ],
   "start_url": ".",
   "display": "standalone",
-  "display_override": ["window-controls-overlay"],
   "theme_color": "#f4a58a",
   "background_color": "#fffcfb",
-  "orientation": "portrait",
-  "scope": "/",
-  "lang": "he"
+  "orientation": "portrait"
 }
