@@ -1,0 +1,9 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="256" cy="256" r="240" fill="#fdf0eb" stroke="#f7d7c4" stroke-width="8"/>
+  <circle cx="256" cy="256" r="200" fill="#ffffff" stroke="#f4a58a" stroke-width="6" stroke-dasharray="15 15"/>
+  
+  <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" font-size="280">👶</text>
+  <text x="50%" y="62%" dominant-baseline="middle" text-anchor="middle" font-size="200">🍼</text>
+  <text x="50%" y="55%" dominant-baseline="middle" text-anchor="middle" font-size="220">🧸</text>
+  <text x="50%" y="58%" dominant-baseline="middle" text-anchor="middle" font-size="300">🧸</text>
+</svg>
