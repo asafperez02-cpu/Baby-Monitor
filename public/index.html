@@ -1,70 +1,11 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>המעקב של עלמה</title>
-    
-    <link rel="stylesheet" href="style.css">
-    
-    <style>
-        body { font-family: sans-serif; text-align: center; background-color: white; }
-        #app { max-width: 600px; margin: auto; padding: 20px; }
-        h1 { font-weight: bold; font-size: 2em; }
-        .main-container { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-        button { padding: 10px 20px; border: none; border-radius: 5px; color: white; cursor: pointer; font-size: 1.1em; }
-        .feed-btn { background-color: #ffcccc; color: #cc6666; }
-        .diaper-btn { background-color: #ccccff; color: #6666cc; }
-        .test-btn { background-color: rgba(224, 236, 255, 1); color: #007bff; margin-top: 20px; text-decoration: underline; border: none; background: none; }
-    </style>
-</head>
-<body>
-
-    <nav id="main-navigation">
-        <ul>
-            <li>דף הבית</li>
-            <li>היסטוריה</li>
-            <li>הגדרות</li>
-        </ul>
-    </nav>
-
-    <div id="app">
-        <div class="main-container">
-            <span class="emoji">👶</span>
-            <span class="main-title">המעקב של עלמה</span>
-        </div>
-        
-        <p>הזן נתוני האכלה או החתלה:</p>
-        
-        <hr>
-        
-        <div class="tracker-buttons">
-            <button class="feed-btn" onclick="addFeed()">🍼 האכלה</button>
-            <button class="diaper-btn" onclick="addDiaper()">🧷 החתלה</button>
-        </div>
-
-        <button class="test-btn" onclick="testFeatures()">בדוק רטט והתראות</button>
-    </div>
-
-    <script src="script.js"></script>
-    <script>
-        // זהו החלק של ביטול PWA ורטט שדיברנו עליו קודם
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                for (let registration of registrations) {
-                    registration.unregister();
-                }
-            });
-        }
-
-        function testFeatures() {
-            if (navigator.vibrate) navigator.vibrate(200);
-            if ("Notification" in window) {
-                Notification.requestPermission().then(permission => {
-                    if (permission === "granted") new Notification("הבדיקה הצליחה!");
-                });
-            }
-        }
-    </script>
-</body>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div> </body>
 </html>
