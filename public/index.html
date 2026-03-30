@@ -14,28 +14,15 @@
   
   <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
   
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+  <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
 
   <style>
+    /* הגדרות גלובליות שגורמות לאתר להרגיש כמו אפליקציה מובנית */
     body { 
       margin: 0; 
+      padding: 0;
       background: #fffcfb; 
-      /* מונע את ה"משיכה" של הדף למטה באייפון */
+      /* מונע את ה"משיכה" הלבנה של הדף למעלה/למטה (Rubber-banding) */
       overscroll-behavior-y: contain;
-      /* מונע בחירת טקסט בכל האפליקציה */
-      -webkit-user-select: none;
-      user-select: none;
-    }
-    
-    /* מאפשר בחירת טקסט רק בשדות קלט (כדי שתוכל להקליד מ"ל) */
-    input, textarea {
-      -webkit-user-select: text;
-      user-select: text;
-    }
-  </style>
-</head>
-<body>
-  <noscript>You need to enable JavaScript to run this app.</noscript>
-  <div id="root"></div>
-</body>
-</html>
+      /* מונע בחירת טקסט בטעות בכל האפליקציה */
+      -webkit-user
