@@ -3,27 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>האפליקציה שלי</title>
+    <title>המעקב של עלמה</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
+    <nav id="main-navigation">
+        <ul>
+            <li>דף הבית</li>
+            <li>היסטוריה</li>
+            <li>הגדרות</li>
+        </ul>
+    </nav>
+
+    <div id="app" style="padding: 20px; text-align: center;">
+        <h1>המעקב של עלמה 👶</h1>
+        
+        <div id="tracker-content">
+            <p>הזן נתוני האכלה או החתלה:</p>
+            </div>
+
+        <hr>
+        <button class="test-btn" onclick="testFeatures()" style="padding: 10px; margin-top: 20px;">
+            בדוק רטט והתראות
+        </button>
+    </div>
+
+    <script src="script.js"></script>
     <script>
-        // ביטול PWA
+        // 1. ביטול ה-Service Worker (PWA)
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
                     registration.unregister();
+                    console.log("PWA Service Worker removed.");
                 }
             });
         }
 
-        // פונקציית רטט והתראות (שתעבוד כשתקרא לה מהכפתורים שלך)
+        // 2. פונקציית רטט והתראות
         function testFeatures() {
-            if (navigator.vibrate) navigator.vibrate(200);
+            // רטט
+            if (navigator.vibrate) {
+                navigator.vibrate([100, 50, 100]); // רטט מקוטע
+            }
+            
+            // התראות
             if ("Notification" in window) {
                 Notification.requestPermission().then(permission => {
-                    if (permission === "granted") new Notification("הבדיקה הצליחה!");
+                    if (permission === "granted") {
+                        new Notification("התראות פעילות!", {
+                            body: "עכשיו האתר יתריע גם בלי להיות PWA",
+                            icon: "icon.png"
+                        });
+                    }
                 });
             }
         }
