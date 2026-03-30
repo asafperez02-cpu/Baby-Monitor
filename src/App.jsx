@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import {
   collection, addDoc, deleteDoc, doc,
   onSnapshot, query, orderBy
@@ -70,9 +70,9 @@ export default function BabyApp() {
   }, []);
 
   const addEvent = async (ev) => {
-    // רטט לאישור פעולה (Native Haptic)
-    if (window.navigator && window.navigator.vibrate) {
-      window.navigator.vibrate(25);
+    // רטט חזק וקצר לאישור (Native Haptic)
+    if ("vibrate" in navigator) {
+      navigator.vibrate(40);
     }
     
     const finalTs = ev.manualTime ? manualTimeToTs(ev.manualTime) : Date.now();
@@ -99,11 +99,9 @@ export default function BabyApp() {
           font-family: ${FONT_MAIN};
         }
         body { 
-          overscroll-behavior-y: contain; 
           margin: 0; 
           background: ${C.bg}; 
-          user-select: none;
-          -webkit-user-select: none;
+          overflow: hidden; /* מונע מהדף כולו לזוז */
         }
         button:active { 
           transform: scale(0.96); 
@@ -112,17 +110,20 @@ export default function BabyApp() {
         .kids-font { font-family: ${FONT_KIDS} !important; }
       `}</style>
 
+      {/* Header קבוע למעלה */}
       <div style={S.headerContainer}>
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
         <MainTimerWidget events={events} now={now} />
       </div>
 
+      {/* אזור התוכן - היחיד שגולל */}
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={deleteEvent} />}
         {tab === "history" && <WeeklySummary events={events} fullView />}
       </div>
 
+      {/* תפריט ניווט קבוע למטה */}
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ראשי</button>
         <button onClick={() => setTab("history")} style={S.navBtn(tab === "history")}>📅 יומן</button>
@@ -159,7 +160,6 @@ function MainTimerWidget({ events, now }) {
 
 function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
-  
   const feedEvents = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a,b) => b.ts - a.ts);
   const diaperEvents = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a,b) => b.ts - a.ts);
 
@@ -173,7 +173,6 @@ function HomeView({ events, setModal, onDelete }) {
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
         <div style={{ display: "flex", gap: 15 }}>
-          {/* טור אוכל */}
           <div style={S.column}>
             <div className="kids-font" style={S.columnHeader}>🍼 אוכל</div>
             {feedEvents.map((e, i) => (
@@ -192,7 +191,6 @@ function HomeView({ events, setModal, onDelete }) {
             ))}
           </div>
 
-          {/* טור חיתול */}
           <div style={S.column}>
             <div className="kids-font" style={S.columnHeader}>🧷 חיתול</div>
             {diaperEvents.map((e, i) => (
@@ -242,32 +240,19 @@ function FeedModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <h3 className="kids-font" style={{ textAlign: "center", marginBottom: 15 }}>מתי וכמה? 🍼</h3>
-        
         <div style={{marginBottom: 20}}>
           <label style={S.label}>שעת האכלה (רטרו):</label>
           <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={S.input} />
         </div>
-
         <div style={{display:'flex', flexWrap:'wrap', gap:8, marginBottom:15}}>
             {[60,90,120,150,180].map(v => (
                 <button key={v} onClick={()=>{setMl(v); setCustomMl("");}} style={S.chip(ml==v)}>{v}</button>
             ))}
         </div>
-        
         <div style={{marginBottom: 20}}>
-          <input 
-            type="number" 
-            value={customMl} 
-            onChange={e => { setCustomMl(e.target.value); setMl(""); }} 
-            placeholder="כמות אחרת במ״ל..." 
-            style={S.input} 
-          />
+          <input type="number" value={customMl} onChange={e => { setCustomMl(e.target.value); setMl(""); }} placeholder="כמות אחרת..." style={S.input} />
         </div>
-
-        <button onClick={() => { 
-          onConfirm({ type: "feed", ml: ml || customMl, manualTime }); 
-          onClose(); 
-        }} style={S.primaryBtn} disabled={(!ml && !customMl) || !manualTime}>שמור עדכון</button>
+        <button onClick={() => { onConfirm({ type: "feed", ml: ml || customMl, manualTime }); onClose(); }} style={S.primaryBtn} disabled={(!ml && !customMl) || !manualTime}>שמור עדכון</button>
       </div>
     </div>
   );
@@ -285,20 +270,15 @@ function DiaperModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e => e.stopPropagation()}>
         <h3 className="kids-font" style={{ textAlign: "center", marginBottom: 15 }}>מתי ומה היה? 💩</h3>
-
         <div style={{marginBottom: 20}}>
           <label style={S.label}>שעת החתלה:</label>
           <input type="time" value={manualTime} onChange={e => setManualTime(e.target.value)} style={S.input} />
         </div>
-
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
           <button onClick={() => setPee(!pee)} style={S.chip(pee)}>💧 פיפי</button>
           <button onClick={() => setPoop(!poop)} style={S.chip(poop)}>💩 קקי</button>
         </div>
-        <button onClick={() => { 
-          onConfirm({ type: "diaper", pee, poop, manualTime }); 
-          onClose(); 
-        }} style={S.primaryBtn} disabled={(!pee && !poop) || !manualTime}>שמור עדכון</button>
+        <button onClick={() => { onConfirm({ type: "diaper", pee, poop, manualTime }); onClose(); }} style={S.primaryBtn} disabled={(!pee && !poop) || !manualTime}>שמור עדכון</button>
       </div>
     </div>
   );
@@ -330,49 +310,61 @@ function WeeklySummary({ events, limit = 7, fullView = false }) {
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: { 
-    direction: "rtl", minHeight: "100vh", maxWidth: 480, margin: "0 auto", 
+    position: "fixed", top: 0, left: 0, right: 0, bottom: 0, // נועל את כל המסגרת
+    display: "flex", flexDirection: "column",
     color: C.text, background: C.bg, 
     userSelect: "none", WebkitUserSelect: "none",
-    touchAction: "manipulation", overscrollBehaviorY: "none"
+    touchAction: "none" // מבטל תנועות דפדפן גלובליות
   },
   headerContainer: { 
+    flexShrink: 0, // לא מתכווץ
     background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, 
-    padding: "30px 20px 40px", borderRadius: "0 0 60px 60px", textAlign: "center",
-    boxShadow: "0 10px 25px rgba(232, 121, 249, 0.25)"
+    padding: "calc(20px + env(safe-area-inset-top)) 20px 30px", // תמיכה ב-Notch
+    borderRadius: "0 0 50px 50px", textAlign: "center",
+    boxShadow: "0 10px 25px rgba(232, 121, 249, 0.25)",
+    zIndex: 10
   },
   greeting: { fontSize: 14, color: "white", fontWeight: 600, opacity: 0.85, marginBottom: 5 },
-  babyBadge: { fontSize: 36, color: "white", fontWeight: 800, marginBottom: 20 },
+  babyBadge: { fontSize: 36, color: "white", fontWeight: 800, marginBottom: 15 },
   mainWidget: {
     background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(12px)",
-    borderRadius: "30px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.3)",
-    display: "inline-block", width: "100%", maxWidth: "320px",
-    boxShadow: "0 8px 32px rgba(0,0,0,0.1)"
+    borderRadius: "25px", padding: "15px", border: "1px solid rgba(255, 255, 255, 0.3)",
+    display: "inline-block", width: "100%", maxWidth: "300px"
   },
   subTimer: {
-    marginTop: 10, fontSize: 13, fontWeight: 700, color: "white",
+    marginTop: 8, fontSize: 12, fontWeight: 700, color: "white",
     background: "rgba(0,0,0,0.1)", padding: "4px 12px", borderRadius: "20px"
   },
-  content: { padding: "20px 15px 120px" },
-  actionBtn: { flex: 1, border: "none", padding: "22px", borderRadius: "25px", fontSize: 20, fontWeight: 800, cursor: "pointer" },
-  card: { background: "white", borderRadius: "30px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
-  cardTitle: { fontSize: 20, fontWeight: 800, marginBottom: 20, textAlign: "center", color: C.peachDark },
-  column: { flex: 1, display: "flex", flexDirection: "column" },
-  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 16, padding: "8px", background: "#fff5f0", borderRadius: "12px", color: C.peachDark, marginBottom: 10 },
-  eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "10px", borderRadius: "15px", border: "1px solid #eee", background: "white" },
-  gapIndicator: { 
-    textAlign: "center", fontSize: 11, color: C.textMuted, 
-    margin: "8px 0", fontWeight: 700, opacity: 0.7 
+  content: { 
+    flex: 1, // לוקח את כל השטח הפנוי
+    overflowY: "auto", // רק כאן מותר לגלוש
+    padding: "20px 15px 40px",
+    WebkitOverflowScrolling: "touch", // גלילה חלקה ב-iOS
+    touchAction: "pan-y" // מאפשר רק גלילה אנכית
   },
+  actionBtn: { flex: 1, border: "none", padding: "20px", borderRadius: "20px", fontSize: 18, fontWeight: 800, cursor: "pointer", fontFamily: FONT_KIDS },
+  card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
+  cardTitle: { fontSize: 18, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
+  column: { flex: 1, display: "flex", flexDirection: "column" },
+  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 14, padding: "8px", background: "#fff5f0", borderRadius: "10px", color: C.peachDark, marginBottom: 10 },
+  eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "10px", borderRadius: "15px", border: "1px solid #eee", background: "white" },
+  gapIndicator: { textAlign: "center", fontSize: 11, color: C.textMuted, margin: "8px 0", fontWeight: 700 },
   delBtn: { background:'none', border:'none', color: '#ccc', fontSize: 14, cursor:'pointer' },
-  eventTime: { fontSize: 13, fontWeight: 800, color: C.textSoft },
-  eventDetail: { fontSize: 16, fontWeight: 700 },
-  summaryRow: { display: "flex", padding: "12px 0", borderBottom: "1px dotted #eee", fontSize: 15 },
-  nav: { position: "fixed", bottom: 0, left: 0, right: 0, background: "rgba(255,255,255,0.9)", backdropFilter:'blur(10px)', display: "flex", borderTop: `1px solid ${C.border}`, padding: "15px 10px 30px" },
-  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "12px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 16 }),
-  input: { width: "100%", padding: "12px", borderRadius: "12px", border: `2px solid ${C.border}`, fontSize: 18, textAlign:'center', fontWeight: 700 },
-  label: { fontSize: 14, fontWeight: 800, color: C.peachDark, marginBottom: 8, display: "block" },
+  eventTime: { fontSize: 12, fontWeight: 800, color: C.textSoft },
+  eventDetail: { fontSize: 15, fontWeight: 700 },
+  summaryRow: { display: "flex", padding: "10px 0", borderBottom: "1px dotted #eee", fontSize: 14 },
+  nav: { 
+    flexShrink: 0,
+    background: "rgba(255,255,255,0.95)", backdropFilter:'blur(10px)', 
+    display: "flex", borderTop: `1px solid ${C.border}`, 
+    padding: "10px 10px calc(10px + env(safe-area-inset-bottom))", // תמיכה בפס התחתון של אייפון
+    zIndex: 10 
+  },
+  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "12px", borderRadius: "15px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 16 }),
+  input: { width: "100%", padding: "12px", borderRadius: "10px", border: `2px solid ${C.border}`, fontSize: 18, textAlign:'center', fontWeight: 700 },
+  label: { fontSize: 13, fontWeight: 800, color: C.peachDark, marginBottom: 5, display: "block" },
   primaryBtn: { width: "100%", padding: "15px", borderRadius: "20px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18, cursor:'pointer' },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 },
-  modal: { background: "white", padding: "30px", borderRadius: "35px", width: "100%", maxWidth: 350 },
-  chip: (active) => ({ flex: "1 0 30%", padding: "12px", borderRadius: "12px", border: active ? `2px solid ${C.peach}` : "1px solid #ddd", background: active ? C.creamSoft : "white", fontWeight: 700, cursor:'pointer' }),
+  modal: { background: "white", padding: "25px", borderRadius: "30px", width: "100%", maxWidth: 350 },
+  chip: (active) => ({ flex: "1 0 30%", padding: "10px", borderRadius: "10px", border: active ? `2px solid ${C.peach}` : "1px solid #ddd", background: active ? C.creamSoft : "white", fontWeight: 700, cursor:'pointer' }),
 };
