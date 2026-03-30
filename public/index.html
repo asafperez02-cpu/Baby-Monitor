@@ -1,52 +1,25 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-  <meta name="theme-color" content="#f4a58a" />
-  
-  <title>עלמה 🌸</title>
-
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="עלמה">
-  
-  <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-  <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo.svg" />
-
-  <style>
-    /* הגדרות למראה אפליקציה */
-    body { 
-      margin: 0; 
-      padding: 0;
-      background: #fffcfb; 
-      overscroll-behavior-y: contain;
-      -webkit-user-select: none;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>האפליקציה שלי</title>
     
-    input, textarea {
-      -webkit-user-select: text;
-      user-select: text;
-    }
-
-    html, body {
-      height: 100%;
-      width: 100%;
-      position: fixed;
-      overflow: hidden;
-    }
-
-    #root {
-      height: 100%;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-  </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <noscript>יש להפעיל JavaScript כדי להריץ את האפליקציה.</noscript>
-  <div id="root"></div>
+    <nav id="main-navigation">
+        <ul>
+            <li>דף הבית</li>
+            <li>הגדרות</li>
+        </ul>
+    </nav>
+
+    <div id="app">
+        <h1>ברוכים הבאים</h1>
+        <p>זו כעת אפליקציית ווב רגילה.</p>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 </html>
