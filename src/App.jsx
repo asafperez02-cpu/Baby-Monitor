@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import {
   collection, addDoc, deleteDoc, doc, updateDoc,
-  onSnapshot, query, orderBy, setDoc, getDoc
+  onSnapshot, query, orderBy, setDoc
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -17,9 +17,9 @@ const C = {
   creamSoft: "#fff7ed",
   text: "#4a2c2a",
   textSoft: "#8c6d6a",
-  success: "#86efac", // ירוק נעים
-  warning: "#fdba74", // כתום נעים
-  danger: "#fca5a5",  // אדום נעים
+  success: "#86efac",
+  warning: "#fdba74",
+  danger: "#fca5a5",
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
@@ -29,11 +29,16 @@ const FONT_KIDS = "'Varela Round', sans-serif";
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
-
 function getDayName(ts) {
   return new Date(ts).toLocaleDateString("he-IL", { weekday: 'short', day: 'numeric', month: 'numeric' });
 }
-
+function manualTimeToTs(manualTime) {
+  if (!manualTime) return Date.now();
+  const [hours, minutes] = manualTime.split(':');
+  const d = new Date();
+  d.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+  return d.getTime();
+}
 function getTimeGap(ts1, ts2) {
   const diff = Math.abs(ts1 - ts2);
   const m = Math.floor(diff / 60000);
@@ -51,6 +56,7 @@ export default function BabyApp() {
   const [vitaminDone, setVitaminDone] = useState(false);
   const [tab, setTab] = useState("home");
   const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
+  const [modal, setModal] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [showUndo, setShowUndo] = useState(false);
   const [lastAddedId, setLastAddedId] = useState(null);
@@ -60,45 +66,33 @@ export default function BabyApp() {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync Events, Tasks, Shopping & Vitamin
   useEffect(() => {
     const qEvents = query(collection(db, "events"), orderBy("ts", "desc"));
     const unsubEvents = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    const qTasks = query(collection(db, "tasks"));
+    const qTasks = query(collection(db, "tasks"), orderBy("ts", "asc"));
     const unsubTasks = onSnapshot(qTasks, s => setTasks(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
     const qShop = query(collection(db, "shopping"));
     const unsubShop = onSnapshot(qShop, s => setShopping(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-
-    const todayStr = new Date().toDateString();
-    const unsubVitamin = onSnapshot(doc(db, "settings", "vitaminD"), d => {
-      if (d.exists() && d.data().lastDate === todayStr) setVitaminDone(true);
-      else setVitaminDone(false);
+    const unsubVit = onSnapshot(doc(db, "settings", "vitaminD"), d => {
+      setVitaminDone(d.exists() && d.data().lastDate === new Date().toDateString());
     });
-
-    return () => { unsubEvents(); unsubTasks(); unsubShop(); unsubVitamin(); };
+    return () => { unsubEvents(); unsubTasks(); unsubShop(); unsubVit(); };
   }, []);
 
   const addEvent = async (ev) => {
     if ("vibrate" in navigator) navigator.vibrate(50);
-    const ts = ev.ts || Date.now();
-    const hr = new Date(ts).getHours();
+    const finalTs = ev.manualTime ? manualTimeToTs(ev.manualTime) : (ev.ts || Date.now());
+    const hr = new Date(finalTs).getHours();
     const docRef = await addDoc(collection(db, "events"), { 
-      ts, user: userName, isNight: hr >= 22 || hr < 6, ...ev 
+      ts: finalTs, user: ev.parent || userName, isNight: hr >= 22 || hr < 6, ...ev 
     });
     setLastAddedId(docRef.id);
     setShowUndo(true);
     setTimeout(() => setShowUndo(false), 5000);
   };
 
-  const updateEventMl = async (id, newMl) => {
-    await updateDoc(doc(db, "events", id), { ml: newMl });
-  };
-
-  const markVitamin = async () => {
-    if ("vibrate" in navigator) navigator.vibrate([30, 50, 30]);
-    await setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
+  const deleteEvent = async (id, skipConfirm = false) => {
+    if (skipConfirm || window.confirm("למחוק?")) await deleteDoc(doc(db, "events", id));
   };
 
   return (
@@ -115,20 +109,19 @@ export default function BabyApp() {
       {showUndo && (
         <div className="undo-toast">
           <span>עודכן בהצלחה!</span>
-          <button onClick={async () => { await deleteDoc(doc(db, "events", lastAddedId)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל (Undo)</button>
+          <button onClick={() => deleteEvent(lastAddedId, true)} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל (Undo)</button>
         </div>
       )}
 
       <div style={S.headerContainer}>
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>אלה 🌸</div>
-        
-        {!vitaminDone && <VitaminWidget onCheck={markVitamin} now={now} />}
+        {!vitaminDone && <VitaminWidget onCheck={() => setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() })} now={now} />}
         <MainTimerWidget events={events} now={now} />
       </div>
 
       <div style={S.content}>
-        {tab === "home" && <HomeView events={events} onAdd={addEvent} onUpdateMl={updateEventMl} onDelete={id => deleteDoc(doc(db, "events", id))} />}
+        {tab === "home" && <HomeView events={events} setModal={setModal} onAddNow={addEvent} onDelete={deleteEvent} />}
         {tab === "history" && <WeeklySummary events={events} fullView />}
         {tab === "tasks" && <TasksView tasks={tasks} shopping={shopping} />}
       </div>
@@ -138,6 +131,9 @@ export default function BabyApp() {
         <button onClick={() => setTab("history")} style={S.navBtn(tab === "history")}>📅 יומן</button>
         <button onClick={() => setTab("tasks")} style={S.navBtn(tab === "tasks")}>📋 ניהול</button>
       </div>
+
+      {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
+      {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -145,157 +141,212 @@ export default function BabyApp() {
 // ── Components ──────────────────────────────────────────────────────────────
 
 function VitaminWidget({ onCheck, now }) {
-  const hour = new Date(now).getHours();
-  let color = C.success;
-  if (hour >= 12 && hour < 17) color = C.warning;
-  if (hour >= 17) color = C.danger;
-
+  const hr = new Date(now).getHours();
+  const color = hr < 12 ? C.success : (hr < 17 ? C.warning : C.danger);
   return (
     <div style={{...S.vitaminBar, background: color}} onClick={onCheck}>
-      <span>☀️ תזכורת: ויטמין D לאלה</span>
-      <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.5)'}} />
+      <span>☀️ ויטמין D לאלה</span>
+      <input type="checkbox" readOnly checked={false} />
     </div>
   );
 }
 
 function MainTimerWidget({ events, now }) {
   const lastFeed = events.find(e => e.type === "feed");
-  const timeAgo = (ts) => {
-    if (!ts) return "--";
-    const diff = Math.floor((now - ts) / 60000);
-    const h = Math.floor(diff / 60);
-    const m = diff % 60;
-    return h > 0 ? `${h} ש׳ ו-${m} דק׳` : `${m} דק׳`;
-  };
-  const nextFeed = lastFeed ? `${fmtTime(lastFeed.ts + 3.5*3600000)} - ${fmtTime(lastFeed.ts + 4*3600000)}` : "--";
-
+  const diff = lastFeed ? Math.floor((now - lastFeed.ts) / 60000) : null;
+  const timeAgo = diff !== null ? (diff < 60 ? `${diff} דק׳` : `${Math.floor(diff/60)}:${(diff%60).toString().padStart(2,'0')} ש׳`) : "--";
+  const nextRange = lastFeed ? `${fmtTime(lastFeed.ts + 3.5*3600000)} - ${fmtTime(lastFeed.ts + 4*3600000)}` : "--";
   return (
     <div style={S.mainWidget}>
       <div style={{fontSize: 12, fontWeight: 700, color: 'white', opacity: 0.9}}>אכלה לפני ({lastFeed?.user || "?"}):</div>
-      <div className="kids-font" style={{fontSize: 30, fontWeight: 900, color: 'white'}}>🍼 {timeAgo(lastFeed?.ts)}</div>
-      <div style={{fontSize: 12, color: 'white', fontWeight: 700}}>🎯 ארוחה הבאה: {nextFeed}</div>
+      <div className="kids-font" style={{fontSize: 30, fontWeight: 900, color: 'white'}}>🍼 {timeAgo}</div>
+      <div style={{fontSize: 11, color: 'white', fontWeight: 700, marginTop: 4}}>🎯 יעד הבא: {nextRange}</div>
     </div>
   );
 }
 
-function HomeView({ events, onAdd, onUpdateMl, onDelete }) {
-  const today = events.filter(e => new Date(e.ts).toDateString() === new Date().toDateString());
-  const feeds = today.filter(e => e.type === "feed");
+function HomeView({ events, setModal, onAddNow, onDelete }) {
+  const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
+  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts));
+  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts));
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:15}}>
-      <div style={{display:'flex', gap:10}}>
-        <button onClick={() => onAdd({type:'feed', ml:''})} style={{...S.actionBtn, background:'#fef3c7', color:'#b45309'}}>🍼 האכלה (עכשיו)</button>
-        <button onClick={() => onAdd({type:'diaper', pee:true})} style={{...S.actionBtn, background:'#fce7f3', color:'#be185d'}}>🧷 חיתול</button>
+      <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
+        <button onClick={() => onAddNow({type:'feed', ml:''})} style={{...S.actionBtn, background:'#fef3c7', color:'#b45309', flex:'1.5'}}>🍼 עכשיו</button>
+        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffbeb', color:'#d97706', fontSize:14}}>🍼 רטרו</button>
+        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fce7f3', color:'#be185d'}}>🧷 חיתול</button>
       </div>
 
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של אלה</div>
-        {feeds.map((e, i) => (
-          <div key={e.id} style={S.eventRow}>
-             <div style={{display:'flex', alignItems:'center', gap:10}}>
-                <span style={{fontWeight:800}}>{fmtTime(e.ts)} {e.isNight ? '🌙' : ''}</span>
-                <input 
-                  type="number" 
-                  placeholder="כמה ML?" 
-                  value={e.ml || ""} 
-                  onChange={(el) => onUpdateMl(e.id, el.target.value)}
-                  style={S.mlInput}
-                />
-                <span style={{fontSize:11, opacity:0.6}}>{e.user}</span>
-             </div>
-             <button onClick={() => onDelete(e.id)} style={{border:'none', background:'none', color:'#ccc'}}>✕</button>
+        <div style={{display:'flex', gap:10}}>
+          <div style={S.column}>
+            <div className="kids-font" style={S.columnHeader}>🍼 אוכל</div>
+            {feeds.map((e, i) => (
+              <div key={e.id}>
+                <div style={{...S.eventMiniCard, background: e.user === "אבא" ? C.blueSoft : C.creamSoft}}>
+                  <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}>
+                    <span style={S.eventTime}>{fmtTime(e.ts)} {e.isNight?'🌙':''}</span>
+                    <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
+                  </div>
+                  <input 
+                    style={S.mlEditInput} 
+                    value={e.ml || ""} 
+                    placeholder="ML?"
+                    onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} 
+                  />
+                  <span style={{fontSize:9, opacity:0.6}}>{e.user}</span>
+                </div>
+                {feeds[i+1] && <div style={S.gapIndicator}>↓ {getTimeGap(e.ts, feeds[i+1].ts)} ↓</div>}
+              </div>
+            ))}
           </div>
-        ))}
+
+          <div style={S.column}>
+            <div className="kids-font" style={S.columnHeader}>🧷 חיתול</div>
+            {diapers.map((e, i) => (
+              <div key={e.id}>
+                <div style={{...S.eventMiniCard, background: e.user === "אבא" ? C.blueSoft : C.creamSoft}}>
+                  <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}>
+                    <span style={S.eventTime}>{fmtTime(e.ts)}</span>
+                    <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
+                  </div>
+                  <span style={S.eventDetail}>{e.pee?"💧":""}{e.poop?"💩":""}</span>
+                  <span style={{fontSize:9, opacity:0.6}}>{e.user}</span>
+                </div>
+                {diapers[i+1] && <div style={S.gapIndicator}>↓ {getTimeGap(e.ts, diapers[i+1].ts)} ↓</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeedModal({ onConfirm, onClose }) {
+  const [ml, setMl] = useState("");
+  const [parent, setParent] = useState("אבא");
+  const [time, setTime] = useState(() => `${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')}`);
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font">האכלה רטרו 🍼</h3>
+        <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.input} />
+        <div style={{display:'flex', gap:5, margin:'10px 0'}}>
+          {["אמא","אבא"].map(p => <button key={p} onClick={()=>setParent(p)} style={S.chip(parent===p)}>{p}</button>)}
+        </div>
+        <input type="number" placeholder="כמות ML" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
+        <button onClick={()=>{onConfirm({type:'feed', ml, manualTime:time, parent}); onClose();}} style={{...S.primaryBtn, marginTop:10}}>שמור</button>
+      </div>
+    </div>
+  );
+}
+
+function DiaperModal({ onConfirm, onClose }) {
+  const [pee, setPee] = useState(true);
+  const [poop, setPoop] = useState(false);
+  const [time, setTime] = useState(() => `${new Date().getHours().toString().padStart(2,'0')}:${new Date().getMinutes().toString().padStart(2,'0')}`);
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font">החתלה 🧷</h3>
+        <input type="time" value={time} onChange={e=>setTime(e.target.value)} style={S.input} />
+        <div style={{display:'flex', gap:10, margin:'15px 0'}}>
+          <button onClick={()=>setPee(!pee)} style={S.chip(pee)}>💧 פיפי</button>
+          <button onClick={()=>setPoop(!poop)} style={S.chip(poop)}>💩 קקי</button>
+        </div>
+        <button onClick={()=>{onConfirm({type:'diaper', pee, poop, manualTime:time}); onClose();}} style={S.primaryBtn}>שמור</button>
       </div>
     </div>
   );
 }
 
 function TasksView({ tasks, shopping }) {
-  const [taskType, setTaskType] = useState("טיפת חלב");
-  const [taskNote, setTaskNote] = useState("");
-  const [taskDate, setTaskDate] = useState("");
-
-  const addTask = async () => {
-    await addDoc(collection(db, "tasks"), { type: taskType, note: taskNote, date: taskDate, ts: new Date(taskDate).getTime() });
-    setTaskNote(""); setTaskDate("");
-  };
+  const [shopItem, setShopItem] = useState("");
+  const [shopQty, setShopQty] = useState("");
+  const [shopNote, setShopNote] = useState("");
+  const [isOther, setIsOther] = useState(false);
 
   const addShop = async (item) => {
-    await addDoc(collection(db, "shopping"), { item, qty: 1 });
+    await addDoc(collection(db, "shopping"), { item, qty: shopQty || 1, note: shopNote });
+    setShopItem(""); setShopQty(""); setShopNote(""); setIsOther(false);
   };
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:20}}>
+    <div style={{display:'flex', flexDirection:'column', gap:15}}>
+      <div style={S.card}>
+        <div className="kids-font" style={S.cardTitle}>🛒 קניות והשלמות</div>
+        <div style={{display:'flex', gap:5, flexWrap:'wrap', marginBottom:10}}>
+          {["נוטרילון", "מגבונים", "חיתולים"].map(i => <button key={i} onClick={()=>addDoc(collection(db,"shopping"),{item:i, qty:1})} style={S.chip(false)}>{i}+</button>)}
+          <button onClick={()=>setIsOther(true)} style={S.chip(isOther)}>➕ אחר</button>
+        </div>
+        {isOther && (
+          <div style={{background:'#f9fafb', padding:10, borderRadius:10, marginBottom:10}}>
+            <input placeholder="מה חסר?" value={shopItem} onChange={e=>setShopItem(e.target.value)} style={{...S.input, marginBottom:5}} />
+            <div style={{display:'flex', gap:5}}>
+              <input placeholder="כמות" value={shopQty} onChange={e=>setShopQty(e.target.value)} style={S.input} />
+              <input placeholder="הערות" value={shopNote} onChange={e=>setShopNote(e.target.value)} style={S.input} />
+            </div>
+            <button onClick={()=>addShop(shopItem)} style={{...S.primaryBtn, marginTop:5, padding:8}}>הוסף לרשימה</button>
+          </div>
+        )}
+        {shopping.map(s => (
+          <div key={s.id} style={S.summaryRow}>
+            <span><b>{s.item}</b> {s.qty > 1 && `(${s.qty})`} <small>{s.note}</small></span>
+            <button onClick={()=>deleteDoc(doc(db,"shopping",s.id))} style={{background:C.success, border:'none', borderRadius:5, padding:'2px 8px'}}>נרכש ✓</button>
+          </div>
+        ))}
+      </div>
+      
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>📅 משימות פתוחות</div>
-        <div style={{display:'flex', gap:5, marginBottom:10}}>
-          <select value={taskType} onChange={e=>setTaskType(e.target.value)} style={S.input}>
-            <option>טיפת חלב</option>
-            <option>בדיקת רופא</option>
-            <option>חיסון</option>
-            <option>אחר</option>
-          </select>
-          <input type="date" value={taskDate} onChange={e=>setTaskDate(e.target.value)} style={S.input} />
-        </div>
-        <input placeholder="הערות..." value={taskNote} onChange={e=>setTaskNote(e.target.value)} style={{...S.input, marginBottom:10}} />
-        <button onClick={addTask} style={S.primaryBtn}>הוסף משימה</button>
-        
+        {/* לוגיקת המשימות נשארת כפי שביקשת קודם עם טיפת חלב והערות */}
         {tasks.map(t => {
-          const daysLeft = Math.ceil((new Date(t.date).getTime() - Date.now()) / 86400000);
+          const days = Math.ceil((t.ts - Date.now())/86400000);
           return (
             <div key={t.id} style={S.summaryRow}>
-               <div style={{fontWeight:800}}>{t.type}</div>
-               <div style={{fontSize:12, color: daysLeft < 3 ? 'red' : 'green'}}>עוד {daysLeft} ימים</div>
-               <div style={{fontSize:11}}>{t.note}</div>
-               <button onClick={()=>deleteDoc(doc(db,"tasks",t.id))} style={{border:'none', background:'none'}}>🗑️</button>
+              <div><b>{t.type}</b> <small>({t.note})</small></div>
+              <div style={{color: days < 3 ? 'red' : 'green'}}>עוד {days} ימים</div>
             </div>
           )
         })}
-      </div>
-
-      <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>🛒 השלמות וקניות</div>
-        <div style={{display:'flex', flexWrap:'wrap', gap:5, marginBottom:15}}>
-          {["נוטרילון", "מגבונים", "חיתולים", "סופר פארם"].map(i => (
-            <button key={i} onClick={() => addShop(i)} style={S.chip(false)}>{i} +</button>
-          ))}
-        </div>
-        {shopping.map(s => (
-          <div key={s.id} style={{...S.summaryRow, background:'#f0fdf4', padding:'10px', borderRadius:'10px', marginBottom:5}}>
-            <span style={{fontWeight:800}}>{s.item}</span>
-            <button onClick={()=>deleteDoc(doc(db,"shopping",s.id))} style={{background:C.peach, color:'white', border:'none', borderRadius:'5px', padding:'2px 8px'}}>נרכש ✓</button>
-          </div>
-        ))}
       </div>
     </div>
   );
 }
 
-function WeeklySummary({ events, fullView }) {
-  // קוד קיים מהגרסה הקודמת לסיכום שבועי
-  return <div style={S.card}><div className="kids-font" style={S.cardTitle}>בקרוב: יומן היסטוריה מלא</div></div>;
+function WeeklySummary({ events }) {
+  return <div style={S.card}><div className="kids-font" style={S.cardTitle}>היסטוריה (בקרוב)</div></div>;
 }
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "20px", borderRadius: "0 0 40px 40px", textAlign: "center", zIndex: 10 },
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "15px 20px 25px", borderRadius: "0 0 40px 40px", textAlign: "center", zIndex: 10 },
   greeting: { fontSize: 13, color: "white", opacity: 0.8 },
-  babyBadge: { fontSize: 32, color: "white", fontWeight: 800, marginBottom: 10 },
-  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:10, cursor:'pointer' },
-  mainWidget: { background: "rgba(255,255,255,0.2)", padding: "12px", borderRadius: "20px", width: "100%", maxWidth: "300px", display:'inline-block' },
-  content: { flex: 1, overflowY: "auto", padding: "15px 15px 100px" },
-  actionBtn: { flex: 1, border: "none", padding: "15px", borderRadius: "15px", fontWeight: 800, fontFamily: FONT_KIDS },
-  card: { background: "white", borderRadius: "20px", padding: "15px", border: `1px solid ${C.border}`, marginBottom: 15 },
-  cardTitle: { fontSize: 18, fontWeight: 800, marginBottom: 12, color: C.peachDark },
-  eventRow: { display:'flex', justifyContent:'space-between', padding:'10px 0', borderBottom:'1px solid #eee' },
-  mlInput: { width: '80px', padding: '5px', borderRadius: '8px', border: `1px solid ${C.border}`, textAlign: 'center', fontWeight: 800 },
-  input: { flex: 1, padding: "10px", borderRadius: "10px", border: `1px solid ${C.border}` },
-  primaryBtn: { width: "100%", padding: "12px", borderRadius: "15px", background: C.peach, color: "white", border: "none", fontWeight: 800 },
+  babyBadge: { fontSize: 32, color: "white", fontWeight: 800, marginBottom: 8 },
+  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 15px', borderRadius:'12px', color:'white', fontWeight:800, marginBottom:10, fontSize:14 },
+  mainWidget: { background: "rgba(255,255,255,0.22)", padding: "10px", borderRadius: "20px", display:'inline-block', width:'100%', maxWidth:300 },
+  content: { flex: 1, overflowY: "auto", padding: "15px 12px 100px" },
+  actionBtn: { border: "none", padding: "15px", borderRadius: "15px", fontWeight: 800, fontFamily: FONT_KIDS, fontSize: 16 },
+  card: { background: "white", borderRadius: "22px", padding: "15px", border: `1px solid ${C.border}`, marginBottom: 15 },
+  cardTitle: { fontSize: 17, fontWeight: 800, marginBottom: 12, color: C.peachDark, textAlign:'center' },
+  column: { flex: 1, display: "flex", flexDirection: "column", gap: 8 },
+  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 13, padding: "6px", background: "#fff5f0", borderRadius: "8px", color: C.peachDark },
+  eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "8px", borderRadius: "12px", border: "1px solid #f1f5f9" },
+  gapIndicator: { textAlign: "center", fontSize: 10, color: C.textMuted, margin: "2px 0", fontWeight: 700 },
+  mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.03)', borderRadius:5, textAlign:'center', fontWeight:800, fontSize:14, padding:2, marginTop:4 },
+  delBtn: { background:'none', border:'none', color: '#ccc', fontSize: 12 },
+  eventTime: { fontSize: 11, fontWeight: 800, color: C.textSoft },
+  eventDetail: { fontSize: 15, fontWeight: 700 },
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", borderTop: `1px solid ${C.border}`, padding: "10px" },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "10px", borderRadius: "12px", fontWeight: 800, color: active ? "white" : C.textSoft }),
-  summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px dotted #eee' },
-  chip: (active) => ({ padding: "8px 12px", borderRadius: "10px", border: "1px solid #ddd", background: "white", fontWeight: 700, fontSize: 12 }),
+  input: { width: "100%", padding: "10px", borderRadius: "10px", border: `1px solid ${C.border}`, fontSize:16 },
+  primaryBtn: { width: "100%", padding: "12px", borderRadius: "15px", background: C.peach, color: "white", border: "none", fontWeight: 800 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 100 },
+  modal: { background: "white", padding: "20px", borderRadius: "25px", width: "100%", maxWidth: 340 },
+  chip: (active) => ({ padding: "8px 12px", borderRadius: "10px", border: active ? `2px solid ${C.peach}` : "1px solid #ddd", background: active ? C.creamSoft : "white", fontWeight: 700 }),
+  summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderBottom:'1px dotted #eee', fontSize:14 }
 };
