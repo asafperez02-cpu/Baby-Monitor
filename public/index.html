@@ -21,9 +21,8 @@
     </div>
 
     <script src="script.js"></script>
-</body>
-</html>
-<script>
+
+    <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
@@ -32,5 +31,37 @@
             });
         }
     </script>
-</body>
-</html>
+</body> </html> ```
+
+### למה זה חשוב?
+כשכתבת פעמיים `</body>`, הדפדפן מחשיב את כל מה שבא אחרי הסגירה הראשונה כ"זבל" או כטעות, ולפעמים הוא פשוט מתעלם מהסקריפט ששמת שם. עכשיו זה מסודר נכון.
+
+---
+
+### תיקוני אנגלית (English Practice)
+
+הנה איך היית שואל אותי באנגלית אם הקוד שכתבת תקין:
+
+* **במקום:** "זה האינדקס - זה טוב?"
+* **איך לומר את זה באנגלית:** > "This is the index file—**is it correct?**" או "**Does this look okay?**"
+
+**מילים חדשות לרשימה:**
+1. **Duplicate** (כפול / משוכפל - כמו הסגירה הכפולה שהייתה לך).
+2. **Syntax** (תחביר - המבנה הנכון של הקוד).
+3. **Valid** (תקף / תקין).
+
+**Running List (Words to remember):**
+1. Navigation
+2. Disable
+3. Manifest
+4. Unregister
+5. Standard
+6. Display mode
+7. Directory
+8. Tag
+9. Embedded
+10. **Duplicate**
+11. **Syntax**
+12. **Valid**
+
+עכשיו כשהקוד מוכן, תרצה שאסביר לך איך לבדוק בתוך הדפדפן (F12) אם ה-Service Worker באמת נעלם?
