@@ -4,46 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>האפליקציה שלי</title>
-    
     <link rel="stylesheet" href="style.css">
-    
-    <style>
-        /* הוספתי קצת עיצוב לכפתור שיהיה קל לראות */
-        .test-btn {
-            padding: 15px 25px;
-            font-size: 18px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 20px;
-        }
-        .test-btn:active {
-            background-color: #0056b3;
-        }
-    </style>
 </head>
 <body>
 
-    <nav id="main-navigation">
-        <ul>
-            <li>דף הבית</li>
-            <li>הגדרות</li>
-        </ul>
-    </nav>
-
-    <div id="app" style="text-align: center; padding: 50px;">
-        <h1>ברוכים הבאים</h1>
-        <p>זו כעת אפליקציית ווב רגילה.</p>
-        
-        <button class="test-btn" onclick="testFeatures()">בדוק רטט והתראה</button>
-    </div>
-
-    <script src="script.js"></script>
-
     <script>
-        // 1. קוד לביטול ה-Service Worker (כדי להסיר את סממני ה-PWA)
+        // ביטול PWA
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.getRegistrations().then(function(registrations) {
                 for (let registration of registrations) {
@@ -52,28 +18,12 @@
             });
         }
 
-        // 2. הפונקציה לבדיקת רטט והתראות
+        // פונקציית רטט והתראות (שתעבוד כשתקרא לה מהכפתורים שלך)
         function testFeatures() {
-            // בדיקת רטט (Vibration)
-            if (navigator.vibrate) {
-                navigator.vibrate(200); // רוטט ל-200 מילי-שניות
-                console.log("Vibration triggered!");
-            } else {
-                console.log("Vibration is not supported on this device/browser.");
-            }
-
-            // בדיקת התראות (Notifications)
-            if (!("Notification" in window)) {
-                alert("הדפדפן הזה לא תומך בהתראות.");
-            } else if (Notification.permission === "granted") {
-                // אם כבר יש אישור, שלח התראה
-                new Notification("בדיקה: ההתראות עובדות!");
-            } else if (Notification.permission !== "denied") {
-                // אם עדיין אין אישור, בקש מהמשתמש
+            if (navigator.vibrate) navigator.vibrate(200);
+            if ("Notification" in window) {
                 Notification.requestPermission().then(permission => {
-                    if (permission === "granted") {
-                        new Notification("תודה שאישרת התראות!");
-                    }
+                    if (permission === "granted") new Notification("הבדיקה הצליחה!");
                 });
             }
         }
