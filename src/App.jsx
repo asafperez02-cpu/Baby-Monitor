@@ -91,7 +91,7 @@ export default function BabyApp() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
-        .undo-toast { position: fixed; bottom: 95px; left: 20px; right: 20px; background: #333; color: white; padding: 14px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .undo-toast { position: fixed; bottom: 95px; left: 20px; right: 20px; background: #333; color: white; padding: 14px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; z-index: 9999; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
       `}</style>
 
       {showUndo && (
@@ -119,7 +119,7 @@ export default function BabyApp() {
             <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.2)'}} />
           </div>
         )}
-        <MainTimerWidget events={events} now={now} />
+        <MainTimerWidget events={events} now={now} onOpenFutureFeeds={() => setModal("futureFeeds")} />
       </div>
 
       <div style={S.content}>
@@ -134,30 +134,83 @@ export default function BabyApp() {
 
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
+      {modal === "futureFeeds" && <FutureFeedsModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-function MainTimerWidget({ events, now }) {
+function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const lastFeed = events.find(e => e.type === "feed");
-  if (!lastFeed) return null;
+  if (!lastFeed) return (
+    <div style={S.mainWidget}>
+      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>אכלה פעם אחרונה:</div>
+      <div className="kids-font" style={{fontSize: 42, fontWeight: 900, color: 'white'}}>--</div>
+    </div>
+  );
   
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
+  // Progress Bar Logic (Max 4 hours = 240 mins)
+  const maxMins = 240;
+  const progressPercent = Math.min((diffMin / maxMins) * 100, 100);
+  
+  // הצבע משתנה ככל שמתקרבים לארוחה הבאה
+  let progColor = C.success; // עד שעתיים וחצי - ירוק רגוע
+  if (diffMin > 150) progColor = "#facc15"; // שעתיים וחצי עד 3 - צהוב
+  if (diffMin > 180) progColor = C.warning; // 3 עד 3.5 שעות - כתום
+  if (diffMin > 210) progColor = "#ef4444"; // מעל 3.5 שעות - אדום רעב!
+
   const nextStart = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000);
   const nextEnd = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
   
   return (
     <div style={S.mainWidget}>
-      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>⏱ זמן מאז האכלה אחרונה:</div>
+      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>אכלה פעם אחרונה:</div>
       <div className="kids-font" style={{fontSize: 42, fontWeight: 900, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
       
-      <div style={S.nextFeedBox}>
+      {/* מד התקדמות */}
+      <div style={{width: '100%', height: '6px', background: 'rgba(255,255,255,0.3)', borderRadius: '10px', marginTop: '10px', overflow: 'hidden'}}>
+        <div style={{width: `${progressPercent}%`, height: '100%', background: progColor, transition: 'width 0.5s ease', borderRadius: '10px'}}></div>
+      </div>
+
+      <div style={{...S.nextFeedBox, cursor: 'pointer'}} onClick={onOpenFutureFeeds}>
         <div style={{fontSize: 11, opacity: 0.9, marginBottom: 2}}>🎯 טווח האכלה משוער הבא:</div>
-        <div style={{fontSize: 16, fontWeight: 800}}>{fmtTime(nextStart)} - {fmtTime(nextEnd)}</div>
+        <div style={{fontSize: 16, fontWeight: 800}}>{fmtTime(nextStart)} - {fmtTime(nextEnd)} 👈</div>
+      </div>
+    </div>
+  );
+}
+
+function FutureFeedsModal({ events, onClose }) {
+  const lastFeed = events.find(e => e.type === "feed");
+  if (!lastFeed) return null;
+
+  // יצירת מערך של 8 האכלות עתידיות (24 שעות) במרווחים של 3-3.5 שעות
+  const futureFeeds = Array.from({length: 8}).map((_, i) => {
+    const start = new Date(lastFeed.ts + (i + 1) * 3 * 60 * 60 * 1000);
+    const end = new Date(lastFeed.ts + (i + 1) * 3.5 * 60 * 60 * 1000);
+    return { start, end };
+  });
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, maxHeight: '80vh', overflowY: 'auto'}} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{textAlign:'center', marginBottom:15, color:C.peachDark}}>תחזית האכלות 🍼</h3>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 15}}>24 השעות הבאות (לפי מרווחי זמן של 3 עד 3.5 שעות)</p>
+        
+        <div style={{display:'flex', flexDirection:'column', gap: 10}}>
+          {futureFeeds.map((feed, index) => (
+            <div key={index} style={S.itemRow}>
+              <span style={{fontWeight: 800, color: C.textSoft}}>ארוחה {index + 1}:</span>
+              <span style={{fontWeight: 800, fontSize: 16}}>{fmtTime(feed.start)} - {fmtTime(feed.end)}</span>
+            </div>
+          ))}
+        </div>
+        
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
       </div>
     </div>
   );
@@ -302,8 +355,6 @@ function DiaperModal({ onConfirm, onClose }) {
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', marginBottom:15, color:C.peachDark}}>החתלה 🧷</h3>
-      
-      {/* תוספת: זמן רטרואקטיבי לחיתול */}
       <div style={{display:'flex', gap:10, marginBottom:15}}>
         <button onClick={()=>setTimeMode("now")} style={S.chip(timeMode==="now")}>עכשיו</button>
         <button onClick={()=>setTimeMode("manual")} style={S.chip(timeMode==="manual")}>זמן אחר</button>
@@ -328,30 +379,27 @@ const S = {
   vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 18px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer' },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(12px)", borderRadius: "25px", padding: "18px 15px", border: "1px solid rgba(255, 255, 255, 0.3)", display: "inline-block", width: "100%", maxWidth: "300px" },
   nextFeedBox: { marginTop: 15, fontSize: 13, fontWeight: 800, color: "white", background: "rgba(0,0,0,0.15)", padding: "8px 15px", borderRadius: "15px" },
-  content: { flex: 1, overflowY: "auto", padding: "20px 15px 100px" },
+  content: { flex: 1, overflowY: "auto", padding: "20px 15px 140px" }, // Increased padding-bottom to fix scroll cutoff
   actionBtn: { flex: 1, border: "none", padding: "18px", borderRadius: "20px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS },
   card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
   cardTitle: { fontSize: 18, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
-  column: { flex: 1, display: "flex", flexDirection: "column", gap: 0 }, // Gap changed to 0 because the chain connects them
+  column: { flex: 1, display: "flex", flexDirection: "column", gap: 0 },
   columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 14, padding: "8px", background: "#fff5f0", borderRadius: "10px", color: C.peachDark, marginBottom: 10 },
   eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "10px", borderRadius: "15px", border: "1px solid #f1f5f9", zIndex: 2, position: 'relative' },
-  
-  // ── Chain UI Design ──
   chainContainer: { display: 'flex', alignItems: 'center', marginTop: '-4px', marginBottom: '-4px', marginRight: '20px', height: '35px', zIndex: 1 },
   chainCurve: { width: '15px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 15px 15px 0', marginLeft: '8px' },
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft },
-  
   mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.05)', borderRadius:8, textAlign:'center', fontWeight:800, fontSize:14, padding:6, marginTop:5 },
   delBtn: { background:'none', border:'none', color: '#ccc', fontSize: 14 },
   eventTime: { fontSize: 12, fontWeight: 800, color: C.textSoft },
   eventDetail: { fontSize: 15, fontWeight: 700, marginTop: 5 },
-  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", borderTop: `1px solid ${C.border}`, padding: "10px calc(10px + env(safe-area-inset-bottom))" },
+  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: C.bg, borderTop: `1px solid ${C.border}`, padding: "10px calc(10px + env(safe-area-inset-bottom))", zIndex: 999, boxShadow: "0 -4px 15px rgba(0,0,0,0.05)" },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "12px", borderRadius: "15px", fontWeight: 800, color: active ? "white" : C.textSoft }),
   input: { width: "100%", padding: "12px", borderRadius: "10px", border: `2px solid ${C.border}`, fontWeight: 700, fontSize: 16 },
   primaryBtn: { width: "100%", padding: "15px", borderRadius: "20px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 17 },
   itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dotted #eee' },
   doneBtn: { background: C.success, border: 'none', borderRadius: '8px', padding: '6px 12px', fontWeight: 800, fontSize: 12 },
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modal: { background: "white", padding: "25px", borderRadius: "30px", width: "90%", maxWidth: 350 },
   chip: (active) => ({ flex: 1, padding: "10px", borderRadius: "10px", border: active ? `2px solid ${C.peach}` : "1px solid #ddd", background: active ? C.creamSoft : "white", fontWeight: 700 }),
 };
