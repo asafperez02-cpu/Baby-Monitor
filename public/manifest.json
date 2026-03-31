@@ -1,15 +1,15 @@
 {
-  "short_name": "המעקב של אלה",
-  "name": "המעקב של אלה",
+  "short_name": "המעקב של עלמה",
+  "name": "המעקב של עלמה",
   "start_url": ".",
   "display": "browser",
   "background_color": "#F5F5F5",
   "theme_color": "#F5F5F5",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "alma-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
       "purpose": "any"
     }
   ]
