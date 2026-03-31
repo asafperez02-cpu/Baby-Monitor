@@ -28,6 +28,7 @@ const FONT_KIDS = "'Varela Round', sans-serif";
 function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
+
 function getTimeGap(ts1, ts2) {
   const diff = Math.abs(ts1 - ts2);
   const m = Math.floor(diff / 60000);
@@ -70,16 +71,15 @@ export default function BabyApp() {
 
   const addEvent = async (ev) => {
     if ("vibrate" in navigator) navigator.vibrate(40);
-    const finalTs = ev.manualTime ? new Date().setHours(...ev.manualTime.split(':')) : Date.now();
+    let finalTs = Date.now();
+    if (ev.manualTime) {
+      const [h, m] = ev.manualTime.split(':');
+      const d = new Date();
+      d.setHours(h, m, 0, 0);
+      finalTs = d.getTime();
+    }
     const docRef = await addDoc(collection(db, "events"), { ts: finalTs, user: userName, ...ev });
     setUndoAction({ type: 'event', id: docRef.id });
-    setShowUndo(true);
-    setTimeout(() => setShowUndo(false), 5000);
-  };
-
-  const markVitamin = async () => {
-    await setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
-    setUndoAction({ type: 'vitamin' });
     setShowUndo(true);
     setTimeout(() => setShowUndo(false), 5000);
   };
@@ -108,7 +108,12 @@ export default function BabyApp() {
       <div style={S.headerContainer}>
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>אלה 🌸</div>
-        {!vitaminDone && <VitaminWidget onCheck={markVitamin} now={now} />}
+        {!vitaminDone && (
+          <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() })}>
+            <span>☀️ ויטמין D לאלה</span>
+            <input type="checkbox" readOnly checked={false} />
+          </div>
+        )}
         <MainTimerWidget events={events} now={now} />
       </div>
 
@@ -130,25 +135,23 @@ export default function BabyApp() {
 
 // ── Components ──────────────────────────────────────────────────────────────
 
-function VitaminWidget({ onCheck, now }) {
-  const hr = new Date(now).getHours();
-  const color = hr < 12 ? C.success : (hr < 17 ? C.warning : C.danger);
-  return (
-    <div style={{...S.vitaminBar, background: color}} onClick={onCheck}>
-      <span>☀️ ויטמין D לאלה</span>
-      <input type="checkbox" readOnly checked={false} style={{transform:'scale(1.2)'}} />
-    </div>
-  );
-}
-
 function MainTimerWidget({ events, now }) {
   const lastFeed = events.find(e => e.type === "feed");
-  const diff = lastFeed ? Math.floor((now - lastFeed.ts) / 60000) : 0;
-  const timeStr = diff < 60 ? `${diff} דק׳` : `${Math.floor(diff/60)}:${(diff%60).toString().padStart(2,'0')} ש׳`;
+  if (!lastFeed) return null;
+  
+  const diffMin = Math.floor((now - lastFeed.ts) / 60000);
+  const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
+  
+  const nextStart = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000);
+  const nextEnd = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
+  
   return (
     <div style={S.mainWidget}>
       <div style={{fontSize: 12, fontWeight: 700, color: 'white', opacity: 0.9}}>אכלה לפני:</div>
       <div className="kids-font" style={{fontSize: 34, fontWeight: 900, color: 'white'}}>🍼 {timeStr}</div>
+      <div style={S.nextFeedBox}>
+        🔔 האכלה הבאה: {fmtTime(nextStart)} - {fmtTime(nextEnd)}
+      </div>
     </div>
   );
 }
@@ -257,13 +260,19 @@ function ManagementView({ shopping, vouchers }) {
 
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
+  const [timeMode, setTimeMode] = useState("now");
   const [manualTime, setManualTime] = useState("");
+
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font">האכלה 🍼</h3>
-      <input type="time" onChange={e=>setManualTime(e.target.value)} style={{...S.input, marginBottom:10}} />
+      <div style={{display:'flex', gap:10, marginBottom:15}}>
+        <button onClick={()=>setTimeMode("now")} style={S.chip(timeMode==="now")}>עכשיו</button>
+        <button onClick={()=>setTimeMode("manual")} style={S.chip(timeMode==="manual")}>זמן אחר</button>
+      </div>
+      {timeMode === "manual" && <input type="time" onChange={e=>setManualTime(e.target.value)} style={{...S.input, marginBottom:10}} />}
       <input type="number" placeholder="כמות ML" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
-      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime}); onClose();}} style={{...S.primaryBtn, marginTop:10}}>שמור</button>
+      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime: timeMode==='manual'?manualTime:null}); onClose();}} style={{...S.primaryBtn, marginTop:10}}>שמור</button>
     </div></div>
   );
 }
@@ -283,11 +292,12 @@ function DiaperModal({ onConfirm, onClose }) {
 // ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(20px + env(safe-area-inset-top)) 20px 30px", borderRadius: "0 0 50px 50px", textAlign: "center", zIndex: 10, boxShadow: "0 10px 25px rgba(232, 121, 249, 0.25)" },
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 25px", borderRadius: "0 0 50px 50px", textAlign: "center", zIndex: 10, boxShadow: "0 10px 25px rgba(232, 121, 249, 0.2)" },
   greeting: { fontSize: 14, color: "white", fontWeight: 600, opacity: 0.85, marginBottom: 5 },
   babyBadge: { fontSize: 36, color: "white", fontWeight: 800, marginBottom: 15 },
   vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer' },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(12px)", borderRadius: "25px", padding: "15px", border: "1px solid rgba(255, 255, 255, 0.3)", display: "inline-block", width: "100%", maxWidth: "300px" },
+  nextFeedBox: { marginTop: 10, fontSize: 12, fontWeight: 800, color: "white", background: "rgba(0,0,0,0.1)", padding: "5px 10px", borderRadius: "15px" },
   content: { flex: 1, overflowY: "auto", padding: "20px 15px 100px" },
   actionBtn: { flex: 1, border: "none", padding: "20px", borderRadius: "20px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS },
   card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
@@ -295,7 +305,7 @@ const S = {
   column: { flex: 1, display: "flex", flexDirection: "column", gap: 10 },
   columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 14, padding: "8px", background: "#fff5f0", borderRadius: "10px", color: C.peachDark },
   eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "10px", borderRadius: "15px", border: "1px solid #f1f5f9" },
-  gapIndicator: { textAlign: "center", fontSize: 11, color: C.textMuted, margin: "8px 0", fontWeight: 700 },
+  gapIndicator: { textAlign: "center", fontSize: 11, color: C.textSoft, margin: "8px 0", fontWeight: 700 },
   mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:6, textAlign:'center', fontWeight:800, fontSize:14, padding:4, marginTop:5 },
   delBtn: { background:'none', border:'none', color: '#ccc', fontSize: 14 },
   eventTime: { fontSize: 12, fontWeight: 800, color: C.textSoft },
