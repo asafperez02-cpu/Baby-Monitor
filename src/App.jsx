@@ -232,7 +232,7 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (The Final Address Fix) ──────────────────────────────────
+// ── AI Component (The Pro Model Fix) ──────────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -278,8 +278,8 @@ ${contextData}
 שאלה מההורה: ${q}
 ענה בעברית קצרה מאוד ונעימה.`;
 
-      // הכתובת המעודכנת (v1 במקום v1beta)
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // שינוי למודל gemini-pro ושימוש ב-v1beta היציב יותר למודל הזה
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -310,7 +310,7 @@ ${contextData}
         {isEditingKey ? (
           <div style={{marginBottom: 20}}>
             <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 15}}>
-              הדבק כאן את מפתח ה-API (ה-AIzaSy...):
+              הדבק כאן את מפתח ה-API:
             </p>
             <input 
               placeholder="הדבק כאן" 
