@@ -53,7 +53,7 @@ export default function BabyApp() {
   const [vouchers, setVouchers] = useState([]);
   const [vitaminDone, setVitaminDone] = useState(false);
   const [tab, setTab] = useState("home");
-  const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
+  const [userName, setUserName] = useState(() => localStorage.getItem("baby_username") || "אבא");
   const [modal, setModal] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [showUndo, setShowUndo] = useState(false);
@@ -92,6 +92,13 @@ export default function BabyApp() {
     setTimeout(() => setShowUndo(false), 5000);
   };
 
+  const switchUser = () => {
+    const users = ["אבא", "אמא", "סבתא"];
+    const next = users[(users.indexOf(userName) + 1) % users.length];
+    setUserName(next);
+    localStorage.setItem("baby_username", next);
+  };
+
   return (
     <div style={S.app}>
       <style>{`
@@ -116,8 +123,8 @@ export default function BabyApp() {
       )}
 
       <div style={S.headerContainer}>
-        <div style={S.greeting}>שלום {userName} 👋</div>
-        <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
+        <div style={S.greeting} onClick={switchUser}>שלום {userName} 👋 (החלף)</div>
+        <div className="kids-font" style={S.babyBadge}>לני 🌸</div>
         {!vitaminDone && (
           <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => {
             setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
@@ -125,7 +132,7 @@ export default function BabyApp() {
             setShowUndo(true);
             setTimeout(() => setShowUndo(false), 5000);
           }}>
-            <span>☀️ ויטמין D לעלמה</span>
+            <span>☀️ ויטמין D ללני</span>
             <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.3)'}} />
           </div>
         )}
@@ -166,14 +173,16 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
-  const targetMins = 210;
+  // Update to 4 hours (240 minutes)
+  const targetMins = 240;
   const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
   
   let progColor = C.success;
-  if (diffMin > 120) progColor = C.warning;
-  if (diffMin > 180) progColor = C.danger;
+  if (diffMin > 150) progColor = C.warning; // שעתיים וחצי - מתחיל להיות צהוב/כתום
+  if (diffMin > 210) progColor = C.danger;  // שלוש וחצי שעות - אדום
 
-  const nextTarget = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000);
+  // Next target calculation - 4 hours
+  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
   
   return (
     <div style={S.mainWidget}>
@@ -191,7 +200,7 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
               ארוחה הבאה: {fmtTime(nextTarget.getTime())}
             </div>
             <div style={{fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: 600}}>
-              * תחזית מוערכת (3.5 ש׳)
+              * תחזית מוערכת (4 ש׳)
             </div>
           </div>
           <div style={{background: 'rgba(255,255,255,0.2)', padding: '8px 14px', borderRadius: '12px', fontSize: 13, fontWeight: 800, color: '#fff', backdropFilter: 'blur(5px)'}}>
@@ -207,15 +216,16 @@ function FutureFeedsModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
 
+  // 12 hours forecast based on 4-hour intervals
   const futureFeeds = Array.from({length: 4}).map((_, i) => {
-    return new Date(lastFeed.ts + (i + 1) * 3.5 * 60 * 60 * 1000);
+    return new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000);
   });
 
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:C.peachDark}}>תחזית ל-12 שעות 🍼</h3>
-        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>הזמנים מחושבים לפי מרווחים של 3.5 שעות מההאכלה האחרונה.</p>
+        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:C.peachDark}}>תחזית ל-16 שעות 🍼</h3>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>הזמנים מחושבים לפי מרווחים של 4 שעות מההאכלה האחרונה.</p>
         
         <div style={{display:'flex', flexDirection:'column', gap: 12}}>
           {futureFeeds.map((time, index) => (
@@ -242,13 +252,14 @@ function HomeView({ events, setModal, onDelete }) {
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
+      {/* Updated Buttons Style */}
       <div style={{display:'flex', gap:12}}>
-        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fef3c7', color:'#b45309'}}>🍼 האכלה</button>
-        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fce7f3', color:'#be185d'}}>🧷 החתלה</button>
+        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffbeb', border: '2px solid #fcd34d', color:'#b45309', boxShadow: '0 6px 15px rgba(252, 211, 77, 0.3)'}}>🍼 האכלה</button>
+        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf2f8', border: '2px solid #f9a8d4', color:'#be185d', boxShadow: '0 6px 15px rgba(249, 168, 212, 0.3)'}}>🧷 החתלה</button>
       </div>
 
       <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
+        <div className="kids-font" style={S.cardTitle}>היום של לני</div>
         <div style={{display:'flex', gap:12}}>
           
           <div style={S.column}>
@@ -329,7 +340,6 @@ function AnalyticsView({ events }) {
   const svgHeight = 160;
   const svgWidth = 320;
   
-  // Create points for the SVG line chart
   const points = chartDays.map((d, i) => {
     const x = chartDays.length === 1 ? svgWidth / 2 : (i / (chartDays.length - 1)) * (svgWidth - 30) + 15;
     const y = svgHeight - 30 - ((d.ml / maxMl) * (svgHeight - 60));
@@ -342,7 +352,6 @@ function AnalyticsView({ events }) {
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
       
-      {/* Line Chart Component */}
       <div style={{...S.card, padding: '25px 15px'}}>
         <div className="kids-font" style={{...S.cardTitle, marginBottom: 5}}>מגמת תזונה שבועית</div>
         <div style={{textAlign: 'center', fontSize: 13, color: C.textSoft, marginBottom: 25}}>סה"כ מ"ל מול ימי השבוע</div>
@@ -355,11 +364,8 @@ function AnalyticsView({ events }) {
                 <stop offset="100%" stopColor={C.peachDark} stopOpacity="0" />
               </linearGradient>
             </defs>
-            {/* Gradient Fill under line */}
             {points.length > 1 && <path d={fillPathData} fill="url(#lineGrad)" />}
-            {/* The Line */}
             {points.length > 1 && <path d={pathData} fill="none" stroke={C.peachDark} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
-            {/* The Points */}
             {points.map((p, i) => (
               <g key={i}>
                 <circle cx={p.x} cy={p.y} r="5" fill={C.white} stroke={C.peachDark} strokeWidth="3" />
@@ -369,7 +375,6 @@ function AnalyticsView({ events }) {
           </svg>
         </div>
         
-        {/* X-Axis Labels */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 15 }}>
           {points.map(p => (
             <div key={p.ts} style={{ textAlign: 'center', flex: 1 }}>
@@ -494,7 +499,7 @@ function DiaperModal({ onConfirm, onClose }) {
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", zIndex: 10, boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
-  greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5 },
+  greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5, cursor: 'pointer' },
   babyBadge: { fontSize: 38, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
   vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", display: "inline-block", width: "100%", maxWidth: "340px", boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
@@ -502,7 +507,7 @@ const S = {
   progressBarFill: { height: '100%', transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '10px' },
   nextFeedBox: { marginTop: 15, color: "white", background: "rgba(0,0,0,0.15)", padding: "12px 18px", borderRadius: "18px", transition: 'background 0.2s', border: '1px solid rgba(255,255,255,0.2)' },
   content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" }, 
-  actionBtn: { flex: 1, border: "none", padding: "18px", borderRadius: "22px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
+  actionBtn: { flex: 1, borderRadius: "22px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS },
   card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid #f1f5f9`, marginBottom: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' },
   cardTitle: { fontSize: 19, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
   column: { flex: 1, display: "flex", flexDirection: "column", gap: 0 },
