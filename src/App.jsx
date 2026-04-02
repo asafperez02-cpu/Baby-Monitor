@@ -5,7 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Premium Edition) ──────────────────────────────────────
+// ── Palette & Theme (Pastel Edition) ──────────────────────────────────────
 const C = {
   bg: "#fffcfb",
   white: "#ffffff",
@@ -124,7 +124,7 @@ export default function BabyApp() {
 
       <div style={S.headerContainer}>
         <div style={S.greeting} onClick={switchUser}>שלום {userName} 👋 (החלף)</div>
-        <div className="kids-font" style={S.babyBadge}>לני 🌸</div>
+        <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
         {!vitaminDone && (
           <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => {
             setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
@@ -132,7 +132,7 @@ export default function BabyApp() {
             setShowUndo(true);
             setTimeout(() => setShowUndo(false), 5000);
           }}>
-            <span>☀️ ויטמין D ללני</span>
+            <span>☀️ ויטמין D לעלמה</span>
             <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.3)'}} />
           </div>
         )}
@@ -173,16 +173,15 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
-  // Update to 4 hours (240 minutes)
+  // Progress Logic (Target is 4 hours = 240 mins)
   const targetMins = 240;
   const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
   
   let progColor = C.success;
-  if (diffMin > 150) progColor = C.warning; // שעתיים וחצי - מתחיל להיות צהוב/כתום
-  if (diffMin > 210) progColor = C.danger;  // שלוש וחצי שעות - אדום
+  if (diffMin > 150) progColor = C.warning;
+  if (diffMin > 210) progColor = C.danger;
 
-  // Next target calculation - 4 hours
-  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
+  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000); // 4 hours
   
   return (
     <div style={S.mainWidget}>
@@ -216,7 +215,7 @@ function FutureFeedsModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
 
-  // 12 hours forecast based on 4-hour intervals
+  // 16 hours forecast (4 intervals of 4 hours)
   const futureFeeds = Array.from({length: 4}).map((_, i) => {
     return new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000);
   });
@@ -252,14 +251,14 @@ function HomeView({ events, setModal, onDelete }) {
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
-      {/* Updated Buttons Style */}
+      {/* Updated Buttons Style - Pastel and Elegant */}
       <div style={{display:'flex', gap:12}}>
-        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffbeb', border: '2px solid #fcd34d', color:'#b45309', boxShadow: '0 6px 15px rgba(252, 211, 77, 0.3)'}}>🍼 האכלה</button>
-        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf2f8', border: '2px solid #f9a8d4', color:'#be185d', boxShadow: '0 6px 15px rgba(249, 168, 212, 0.3)'}}>🧷 החתלה</button>
+        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', border: '1px solid #f7e0b5', color:'#854d0e', boxShadow: '0 3px 6px rgba(0,0,0,0.05)'}}>🍼 האכלה</button>
+        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf4ff', border: '1px solid #e9d5ff', color:'#701a75', boxShadow: '0 3px 6px rgba(0,0,0,0.05)'}}>🧷 החתלה</button>
       </div>
 
       <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>היום של לני</div>
+        <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
         <div style={{display:'flex', gap:12}}>
           
           <div style={S.column}>
