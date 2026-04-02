@@ -5,7 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Pro Edition) ──────────────────────────────────────────
+// ── Palette & Theme (Premium Edition) ──────────────────────────────────────
 const C = {
   bg: "#fffcfb",
   white: "#ffffff",
@@ -30,7 +30,11 @@ function fmtTime(ts) {
 }
 
 function getDayName(ts) {
-  return new Date(ts).toLocaleDateString("he-IL", { weekday: 'short', day: 'numeric', month: 'numeric' });
+  return new Date(ts).toLocaleDateString("he-IL", { weekday: 'short' });
+}
+
+function fmtDateShort(ts) {
+  return new Date(ts).toLocaleDateString("he-IL", { day: '2-digit', month: '2-digit' });
 }
 
 function getTimeGap(ts1, ts2) {
@@ -130,13 +134,13 @@ export default function BabyApp() {
 
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
-        {tab === "history" && <WeeklyHistory events={events} />}
+        {tab === "analytics" && <AnalyticsView events={events} />}
         {tab === "tasks" && <ManagementView shopping={shopping} vouchers={vouchers} />}
       </div>
 
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ראשי</button>
-        <button onClick={() => setTab("history")} style={S.navBtn(tab === "history")}>📅 היסטוריה</button>
+        <button onClick={() => setTab("analytics")} style={S.navBtn(tab === "analytics")}>📊 נתונים</button>
         <button onClick={() => setTab("tasks")} style={S.navBtn(tab === "tasks")}>📋 ניהול</button>
       </div>
 
@@ -162,33 +166,37 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
-  // Progress Logic (Target is 3.5 hours = 210 mins)
   const targetMins = 210;
   const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
   
   let progColor = C.success;
-  if (diffMin > 120) progColor = C.warning; // מעל שעתיים: כתום
-  if (diffMin > 180) progColor = C.danger;  // מעל 3 שעות: אדום
+  if (diffMin > 120) progColor = C.warning;
+  if (diffMin > 180) progColor = C.danger;
 
-  const nextTarget = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000); // היעד הוא 3.5 שעות
+  const nextTarget = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000);
   
   return (
     <div style={S.mainWidget}>
-      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה פעם אחרונה:</div>
-      <div className="kids-font" style={{fontSize: 44, fontWeight: 900, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
+      <div style={{fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה פעם אחרונה:</div>
+      <div className="kids-font" style={{fontSize: 48, fontWeight: 900, color: 'white', textShadow: '0 2px 8px rgba(0,0,0,0.15)', letterSpacing: '1px'}}>🍼 {timeStr}</div>
       
-      {/* Progress Bar */}
       <div style={S.progressBarContainer}>
         <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
       </div>
 
-      <div style={{...S.nextFeedBox, cursor: 'pointer'}} onClick={onOpenFutureFeeds}>
+      <div style={S.nextFeedBox} onClick={onOpenFutureFeeds}>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div>
-            <div style={{fontSize: 11, opacity: 0.9, marginBottom: 2}}>🎯 ארוחה הבאה (משוער):</div>
-            <div style={{fontSize: 16, fontWeight: 800}}>{fmtTime(nextTarget.getTime())}</div>
+          <div style={{textAlign: 'right'}}>
+            <div style={{fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '0.5px'}}>
+              ארוחה הבאה: {fmtTime(nextTarget.getTime())}
+            </div>
+            <div style={{fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4, fontWeight: 600}}>
+              * תחזית מוערכת (3.5 ש׳)
+            </div>
           </div>
-          <div style={{fontSize: 20, opacity: 0.8}}>👉</div>
+          <div style={{background: 'rgba(255,255,255,0.2)', padding: '8px 14px', borderRadius: '12px', fontSize: 13, fontWeight: 800, color: '#fff', backdropFilter: 'blur(5px)'}}>
+            פירוט
+          </div>
         </div>
       </div>
     </div>
@@ -199,7 +207,6 @@ function FutureFeedsModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
 
-  // 12 hours forecast (4 intervals of 3.5 hours)
   const futureFeeds = Array.from({length: 4}).map((_, i) => {
     return new Date(lastFeed.ts + (i + 1) * 3.5 * 60 * 60 * 1000);
   });
@@ -218,7 +225,7 @@ function FutureFeedsModal({ events, onClose }) {
             </div>
           ))}
         </div>
-        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, תודה</button>
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
       </div>
     </div>
   );
@@ -229,7 +236,6 @@ function HomeView({ events, setModal, onDelete }) {
   const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
   const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
 
-  // Daily Summaries
   const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
   const totalPee = diapers.filter(e => e.pee).length;
   const totalPoop = diapers.filter(e => e.poop).length;
@@ -305,8 +311,7 @@ function HomeView({ events, setModal, onDelete }) {
   );
 }
 
-function WeeklyHistory({ events }) {
-  // Aggregate data by day
+function AnalyticsView({ events }) {
   const daysMap = {};
   events.forEach(e => {
     const d = new Date(e.ts).toDateString();
@@ -318,44 +323,71 @@ function WeeklyHistory({ events }) {
   });
 
   const sortedDays = Object.values(daysMap).sort((a,b) => b.ts - a.ts).slice(0, 7);
-  const chartDays = [...sortedDays].reverse(); // Oldest to newest for graph
+  const chartDays = [...sortedDays].reverse(); 
   
-  // Find max for graph scaling
-  const maxMl = Math.max(...chartDays.map(d => d.ml), 800); // default min scale of 800
+  const maxMl = Math.max(...chartDays.map(d => d.ml), 100);
+  const svgHeight = 160;
+  const svgWidth = 320;
+  
+  // Create points for the SVG line chart
+  const points = chartDays.map((d, i) => {
+    const x = chartDays.length === 1 ? svgWidth / 2 : (i / (chartDays.length - 1)) * (svgWidth - 30) + 15;
+    const y = svgHeight - 30 - ((d.ml / maxMl) * (svgHeight - 60));
+    return { ...d, x, y };
+  });
+
+  const pathData = points.length > 0 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') : "";
+  const fillPathData = points.length > 0 ? `${pathData} L ${points[points.length-1].x} ${svgHeight} L ${points[0].x} ${svgHeight} Z` : "";
 
   return (
-    <div style={{display:'flex', flexDirection:'column', gap:15}}>
+    <div style={{display:'flex', flexDirection:'column', gap:20}}>
       
-      {/* Trend Graph */}
-      <div style={S.card}>
-        <div className="kids-font" style={{...S.cardTitle, marginBottom: 30}}>מגמת תזונה שבועית (מ"ל)</div>
-        <div style={S.chartWrapper}>
-          {chartDays.map((d, i) => {
-            const prev = chartDays[i-1];
-            const isUp = prev ? d.ml >= prev.ml : true;
-            const heightPercent = Math.max((d.ml / maxMl) * 100, 10); // min 10% height
-
-            return (
-              <div key={d.ts} style={S.chartColumn}>
-                <div style={{...S.chartBar, height: `${heightPercent}%`, background: isUp ? C.success : C.danger}}>
-                   <span style={S.chartVal}>{d.ml}</span>
-                </div>
-                <div style={S.chartLabel}>{getDayName(d.ts).split(' ')[0]}</div>
-              </div>
-            );
-          })}
+      {/* Line Chart Component */}
+      <div style={{...S.card, padding: '25px 15px'}}>
+        <div className="kids-font" style={{...S.cardTitle, marginBottom: 5}}>מגמת תזונה שבועית</div>
+        <div style={{textAlign: 'center', fontSize: 13, color: C.textSoft, marginBottom: 25}}>סה"כ מ"ל מול ימי השבוע</div>
+        
+        <div style={{ position: 'relative', width: '100%', height: svgHeight }}>
+          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} style={{ width: '100%', height: '100%', overflow: 'visible' }}>
+            <defs>
+              <linearGradient id="lineGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={C.peachDark} stopOpacity="0.3" />
+                <stop offset="100%" stopColor={C.peachDark} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            {/* Gradient Fill under line */}
+            {points.length > 1 && <path d={fillPathData} fill="url(#lineGrad)" />}
+            {/* The Line */}
+            {points.length > 1 && <path d={pathData} fill="none" stroke={C.peachDark} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />}
+            {/* The Points */}
+            {points.map((p, i) => (
+              <g key={i}>
+                <circle cx={p.x} cy={p.y} r="5" fill={C.white} stroke={C.peachDark} strokeWidth="3" />
+                <text x={p.x} y={p.y - 12} textAnchor="middle" fontSize="13" fontWeight="800" fill={C.text}>{p.ml}</text>
+              </g>
+            ))}
+          </svg>
         </div>
-        <div style={{textAlign:'center', fontSize:12, color:C.textSoft, marginTop:15, fontWeight: 700}}>
-          <span style={{color:C.success}}>▲ עליה</span> &nbsp;|&nbsp; <span style={{color:C.danger}}>▼ ירידה</span>
+        
+        {/* X-Axis Labels */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 15 }}>
+          {points.map(p => (
+            <div key={p.ts} style={{ textAlign: 'center', flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: C.text }}>{getDayName(p.ts).split(' ')[0]}</div>
+              <div style={{ fontSize: 11, color: C.textSoft }}>{fmtDateShort(p.ts)}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: C.peachDark, marginTop: 6, background: C.creamSoft, borderRadius: 6, padding: '3px 0' }}>{p.count} ארוחות</div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {/* Text Summary */}
       <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>פירוט יומי - אוכל</div>
+        <div className="kids-font" style={S.cardTitle}>פירוט נתונים יומי</div>
         {sortedDays.map(d => (
           <div key={d.ts} style={S.summaryRow}>
-            <div style={{fontWeight:800, width:100}}>{getDayName(d.ts)}</div>
+            <div style={{fontWeight:800, width:100}}>
+              {getDayName(d.ts)} <span style={{fontSize: 12, color: C.textSoft, fontWeight: 400}}>({fmtDateShort(d.ts)})</span>
+            </div>
             <div style={{flex:1, color:C.peachDark, fontWeight:800, fontSize: 16}}>🍼 {d.ml} מ"ל</div>
             <div style={{fontSize:13, color:C.textSoft, fontWeight: 700}}>{d.count} ארוחות</div>
           </div>
@@ -463,13 +495,13 @@ const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", zIndex: 10, boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5 },
-  babyBadge: { fontSize: 36, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
+  babyBadge: { fontSize: 38, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
   vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", display: "inline-block", width: "100%", maxWidth: "320px", boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
-  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.1)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
+  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", display: "inline-block", width: "100%", maxWidth: "340px", boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
+  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '10px' },
-  nextFeedBox: { marginTop: 15, color: "white", background: "rgba(0,0,0,0.15)", padding: "10px 15px", borderRadius: "15px", transition: 'background 0.2s' },
-  content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" }, // Padding fix for scrolling!
+  nextFeedBox: { marginTop: 15, color: "white", background: "rgba(0,0,0,0.15)", padding: "12px 18px", borderRadius: "18px", transition: 'background 0.2s', border: '1px solid rgba(255,255,255,0.2)' },
+  content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" }, 
   actionBtn: { flex: 1, border: "none", padding: "18px", borderRadius: "22px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
   card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid #f1f5f9`, marginBottom: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' },
   cardTitle: { fontSize: 19, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
@@ -479,12 +511,7 @@ const S = {
   chainContainer: { display: 'flex', alignItems: 'center', marginTop: '-6px', marginBottom: '-6px', marginRight: '20px', height: '40px', zIndex: 1 },
   chainCurve: { width: '18px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 20px 20px 0', marginLeft: '10px', opacity: 0.8 },
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft },
-  summaryBarSmall: { marginTop: 15, padding: "12px 5px", background: "#f8fafc", borderRadius: "15px", fontSize: 11, textAlign: "center", border: "1px solid #f1f5f9" },
-  chartWrapper: { display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 180, padding: "10px 5px", borderBottom: "2px solid #f1f5f9" },
-  chartColumn: { display: "flex", flexDirection: "column", alignItems: "center", flex: 1, height: "100%" },
-  chartBar: { width: "65%", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "center", position: "relative", transition: "height 0.6s cubic-bezier(0.4, 0, 0.2, 1)" },
-  chartVal: { position: "absolute", top: -22, fontSize: 11, fontWeight: 800, color: C.text },
-  chartLabel: { fontSize: 11, marginTop: 10, fontWeight: 800, color: C.textSoft },
+  summaryBarSmall: { marginTop: 15, padding: "12px 5px", background: "#f8fafc", borderRadius: "15px", textAlign: "center", border: "1px solid #f1f5f9" },
   mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:8, textAlign:'center', fontWeight:800, fontSize:15, padding:8, marginTop:8 },
   delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer' },
   eventTime: { fontSize: 13, fontWeight: 800, color: C.textSoft },
