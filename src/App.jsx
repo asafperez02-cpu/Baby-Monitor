@@ -5,70 +5,44 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Strong Pastel) ──────────────────────────────────────
+// ── Palette & Theme ────────────────────────────────────────────────────────
 const C = {
-  bg: "#fffcfb",
-  white: "#ffffff",
-  border: "#f7d7c4",
-  peach: "#f4a58a",
-  peachDark: "#e8845e",
-  blueSoft: "#e0f2fe",
-  creamSoft: "#fff7ed",
-  text: "#4a2c2a",
-  textSoft: "#8c6d6a",
-  success: "#34d399",
-  warning: "#fbbf24",
-  danger: "#f87171",
+  bg: "#fffcfb", white: "#ffffff", border: "#f7d7c4", peach: "#f4a58a",
+  peachDark: "#e8845e", blueSoft: "#e0f2fe", creamSoft: "#fff7ed",
+  text: "#4a2c2a", textSoft: "#8c6d6a", success: "#34d399", warning: "#fbbf24", danger: "#f87171",
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
 const FONT_KIDS = "'Varela Round', sans-serif"; 
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-}
-
-function getHebrewDay(ts) {
-  const days = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת'];
-  return `יום ${days[new Date(ts).getDay()]}`;
-}
-
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }); }
+function getHebrewDay(ts) { const days = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת']; return `יום ${days[new Date(ts).getDay()]}`; }
 function getTimeGap(ts1, ts2) {
-  const diff = Math.abs(ts1 - ts2);
-  const m = Math.floor(diff / 60000);
+  const m = Math.floor(Math.abs(ts1 - ts2) / 60000);
   if (m < 60) return `${m} דק׳`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm ? `${h}:${rm.toString().padStart(2, '0')} ש׳` : `${h} ש׳`;
+  return `${Math.floor(m / 60)}:${(m % 60).toString().padStart(2, '0')} ש׳`;
 }
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function BabyApp() {
   const [events, setEvents] = useState([]);
   const [tab, setTab] = useState("home");
-  const [userName, setUserName] = useState(() => localStorage.getItem("baby_username") || "אבא");
+  const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
   const [modal, setModal] = useState(null);
   const [now, setNow] = useState(Date.now());
   const [showUndo, setShowUndo] = useState(false);
-  const [undoAction, setUndoAction] = useState(null);
+  const [undoId, setUndoId] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  useEffect(() => {
     const qEvents = query(collection(db, "events"), orderBy("ts", "desc"));
-    const unsubEvents = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => unsubEvents();
+    const unsub = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    return () => { clearInterval(timer); unsub(); };
   }, []);
 
   const addEvent = async (ev) => {
-    if ("vibrate" in navigator) navigator.vibrate(40);
     const docRef = await addDoc(collection(db, "events"), { ts: Date.now(), user: userName, ...ev });
-    setUndoAction({ id: docRef.id });
-    setShowUndo(true);
+    setUndoId(docRef.id); setShowUndo(true);
     setTimeout(() => setShowUndo(false), 5000);
   };
 
@@ -83,8 +57,8 @@ export default function BabyApp() {
 
       {showUndo && (
         <div style={S.undoToast}>
-          <span>נרשם בהצלחה! ✨</span>
-          <button onClick={async () => { await deleteDoc(doc(db,"events",undoAction.id)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל</button>
+          <span>נרשם! ✨</span>
+          <button onClick={async () => { await deleteDoc(doc(db,"events",undoId)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל</button>
         </div>
       )}
 
@@ -96,7 +70,7 @@ export default function BabyApp() {
 
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
-        {tab === "analytics" && <div style={S.card}>סטטיסטיקות בקרוב... 📊</div>}
+        {tab === "analytics" && <div style={S.card}>גרפים בקרוב... 📊</div>}
       </div>
 
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
@@ -113,8 +87,6 @@ export default function BabyApp() {
     </div>
   );
 }
-
-// ── Components ──────────────────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -134,56 +106,30 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   );
 }
 
-function FutureFeedsModal({ events, onClose }) {
-  const lastFeed = events.find(e => e.type === "feed");
-  if (!lastFeed) return null;
-  const futureFeeds = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>תחזית ארוחות ⏰</h3>
-        {futureFeeds.map((time, i) => (
-          <div key={i} style={S.itemRow}><span>ארוחה {i+1}:</span><span style={{fontWeight:800}}>{fmtTime(time.getTime())}</span></div>
-        ))}
-        <button onClick={onClose} style={S.primaryBtn}>סגור</button>
-    </div></div>
-  );
-}
-
-// ── AI Component (The Bulletproof Fix) ────────────────────────────────────
+// ── AI Component (Hugging Face Version) ──────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const [localKey, setLocalKey] = useState(() => localStorage.getItem("gemini_key") || "");
-  const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("gemini_key"));
+  const [localKey, setLocalKey] = useState(() => localStorage.getItem("hf_key") || "");
+  const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("hf_key"));
 
   const askAi = async () => {
     if (!q.trim() || !localKey) return;
     setLoading(true);
-    setAns("מנתחת נתונים... 🌸");
+    setAns("חושבת... ✨");
     try {
-      const history = events.slice(0, 15).map(e => {
-        const t = new Date(e.ts).toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
-        return e.type === 'feed' ? `${t}: אכלה ${e.ml} מ"ל` : `${t}: חיתול`;
-      }).join('\n');
-
-      // הכתובת החדשה והיציבה ביותר
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${localKey.trim()}`;
-
-      const res = await fetch(url, {
+      const history = events.slice(0, 10).map(e => `${new Date(e.ts).getHours()}:${new Date(e.ts).getMinutes()}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
+      
+      const res = await fetch("https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `נתונים: ${history}. שאלה: ${q}. ענה בעברית קצרה מאוד.` }] }]
-        })
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localKey.trim()}` },
+        body: JSON.stringify({ inputs: `<s>[INST] נתונים: ${history}. שאלה בעברית: ${q}. ענה בעברית קצרה מאוד. [/INST]` })
       });
 
       const data = await res.json();
-      if (data.error) {
-        setAns(`שגיאה: ${data.error.message}`);
-      } else {
-        setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "לא הצלחתי להבין.");
-      }
+      const rawText = data[0]?.generated_text || "";
+      setAns(rawText.split('[/INST]').pop().trim() || "לא הצלחתי לענות.");
     } catch (err) { setAns("שגיאת תקשורת."); }
     setLoading(false);
   };
@@ -193,16 +139,16 @@ function AiModal({ events, onClose }) {
         <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
         {isEditingKey ? (
           <div>
-            <p style={{fontSize:13, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק כאן מפתח API מ-Google Studio:</p>
-            <input placeholder="AIza..." value={localKey} onChange={e=>setLocalKey(e.target.value)} style={S.input} />
-            <button onClick={() => { localStorage.setItem("gemini_key", localKey.trim()); setIsEditingKey(false); }} style={S.primaryBtn}>שמור מפתח</button>
+            <p style={{fontSize:12, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק מפתח (hf_...) מ-Hugging Face:</p>
+            <input placeholder="hf_..." value={localKey} onChange={e=>setLocalKey(e.target.value)} style={S.input} />
+            <button onClick={() => { localStorage.setItem("hf_key", localKey.trim()); setIsEditingKey(false); }} style={S.primaryBtn}>שמור מפתח</button>
           </div>
         ) : (
           <>
             <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"חושבת...":"שאל אותי"}</button>
+            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"...":"שאל אותי"}</button>
             {ans && <div style={S.aiResponse}>{ans}</div>}
-            <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:11, marginTop:20, textDecoration:'underline', width:'100%'}}>עדכון מפתח API</button>
+            <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:10, marginTop:15, textDecoration:'underline', width:'100%'}}>החלף מפתח</button>
           </>
         )}
     </div></div>
@@ -214,55 +160,64 @@ function HomeView({ events, setModal, onDelete }) {
   const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
   const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
   const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
-
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
       <div style={{display:'flex', gap:15}}>
-        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5', boxShadow: '0 4px 12px rgba(247,224,181,0.5)'}}>🍼 האכלה</button>
-        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf4ff', color:'#701a75', border:'1px solid #e9d5ff', boxShadow: '0 4px 12px rgba(233,213,255,0.5)'}}>🧷 חיתול</button>
+        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5'}}>🍼 האכלה</button>
+        <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf4ff', color:'#701a75', border:'1px solid #e9d5ff'}}>🧷 חיתול</button>
       </div>
-      <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
-        <div style={{display:'flex', gap:12}}>
-          <div style={{flex:1}}>
-            <div style={S.columnHeader}>אוכל ({totalMl}ml)</div>
-            {feeds.map((e, i) => (
-              <div key={e.id}>
-                <div style={{...S.eventMiniCard, background: C.creamSoft}}>
-                  <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div>
-                  <input style={S.mlEditInput} value={e.ml || ""} placeholder="ML" onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} />
-                </div>
-                {feeds[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, feeds[i+1].ts)}</div></div>}
-              </div>
-            ))}
-          </div>
-          <div style={{flex:1}}>
-            <div style={S.columnHeader}>חיתול ({diapers.length})</div>
-            {diapers.map((e, i) => (
-              <div key={e.id}>
-                <div style={{...S.eventMiniCard, background: C.blueSoft}}>
-                  <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div>
-                  <div style={{fontWeight:800}}>{e.pee?"💧":""}{e.poop?"💩":""}</div>
-                </div>
-                {diapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, diapers[i+1].ts)}</div></div>}
-              </div>
-            ))}
-          </div>
+      <div style={S.card}><div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
+        <div style={{display:'flex', gap:10}}>
+          <div style={{flex:1}}><div style={S.columnHeader}>אוכל ({totalMl}ml)</div>{feeds.map((e, i) => ( <div key={e.id}><div style={{...S.eventMiniCard, background: C.creamSoft}}><div style={{display:'flex', justifyContent:'space-between'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div><div style={{fontWeight:800}}>{e.ml}ml</div></div>{feeds[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, feeds[i+1].ts)}</div></div>}</div>))}</div>
+          <div style={{flex:1}}><div style={S.columnHeader}>חיתול ({diapers.length})</div>{diapers.map((e, i) => ( <div key={e.id}><div style={{...S.eventMiniCard, background: C.blueSoft}}><div style={{display:'flex', justifyContent:'space-between'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div><div style={{fontWeight:800}}>🧷</div></div>{diapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, diapers[i+1].ts)}</div></div>}</div>))}</div>
         </div>
       </div>
     </div>
   );
 }
 
+function FutureFeedsModal({ events, onClose }) {
+  const lastFeed = events.find(e => e.type === "feed");
+  if (!lastFeed) return null;
+  const future = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>תחזית ארוחות ⏰</h3>
+      {future.map((t, i) => ( <div key={i} style={S.itemRow}><span>ארוחה {i+1}:</span><span style={{fontWeight:800}}>{fmtTime(t.getTime())}</span></div> ))}
+      <button onClick={onClose} style={S.primaryBtn}>סגור</button>
+    </div></div>
+  );
+}
+
+function FeedModal({ onConfirm, onClose }) {
+  const [ml, setMl] = useState("");
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font">האכלה 🍼</h3>
+      <input type="number" placeholder="כמות מ״ל" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
+      <button onClick={()=>{onConfirm({type:'feed', ml}); onClose();}} style={S.primaryBtn}>שמור</button>
+    </div></div>
+  );
+}
+
+function DiaperModal({ onConfirm, onClose }) {
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font">חיתול הוחלף? 🧷</h3>
+      <button onClick={()=>{onConfirm({type:'diaper'}); onClose();}} style={S.primaryBtn}>כן, הכל נקי</button>
+    </div></div>
+  );
+}
+
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
-  greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5 },
-  babyBadge: { fontSize: 38, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "45px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.3)" },
+  greeting: { fontSize: 13, color: "white", opacity: 0.9, marginBottom: 5 },
+  babyBadge: { fontSize: 42, color: "white", fontWeight: 800, marginBottom: 20 },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", width: "100%", maxWidth: "340px", display: "inline-block" },
-  nextFeedBox: { marginTop: 15, background: "rgba(255,255,255,0.7)", padding: "12px", borderRadius: "18px" },
+  nextFeedBox: { marginTop: 15, background: "rgba(255,255,255,0.8)", padding: "10px", borderRadius: "15px" },
   content: { flex: 1, overflowY: "auto", padding: "25px 20px" },
-  actionBtn: { flex: 1, padding: "22px 10px", borderRadius: "24px", fontSize: 20, fontWeight: 800, border:'none' },
+  actionBtn: { flex: 1, padding: "22px 10px", borderRadius: "24px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
   card: { background: "white", borderRadius: "30px", padding: "25px", boxShadow: '0 10px 30px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9' },
   cardTitle: { fontSize: 20, fontWeight: 800, marginBottom: 20, textAlign: "center", color: C.peachDark },
   columnHeader: { textAlign: "center", fontSize: 13, fontWeight: 800, color: C.textSoft, marginBottom: 12, background: '#f8fafc', padding: '8px', borderRadius: '12px' },
@@ -270,16 +225,15 @@ const S = {
   chainContainer: { display: 'flex', alignItems: 'center', marginTop: '-6px', marginBottom: '-6px', marginRight: '20px', height: '40px' },
   chainCurve: { width: '18px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 20px 20px 0', marginLeft: '10px' },
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft },
-  mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:8, textAlign:'center', fontWeight:800, marginTop:8, padding:5 },
   delBtn: { border: 'none', background: 'none', color: '#cbd5e1' },
   nav: { display: "flex", background: "white", borderTop: `1px solid #f1f5f9`, padding: "18px 25px 30px" },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "14px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft }),
-  aiFab: { position: "fixed", bottom: 90, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 99 },
+  aiFab: { position: "fixed", bottom: 100, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 99 },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "90%", maxWidth: "380px" },
   input: { width: "100%", padding: "16px", borderRadius: "20px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 18, fontWeight: 700 },
   primaryBtn: { width: "100%", padding: "18px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18 },
-  aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 16, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700 },
-  undoToast: { position: 'fixed', bottom: 110, right: 20, left: 20, background: '#333', color: 'white', padding: '15px 25px', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 9999 },
-  itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0' }
+  aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 15, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700 },
+  itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px dotted #eee' },
+  undoToast: { position: 'fixed', bottom: 110, right: 20, left: 20, background: '#333', color: 'white', padding: '15px 25px', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 9999 }
 };
