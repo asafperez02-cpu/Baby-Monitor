@@ -5,7 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme ────────────────────────────────────────────────────────
+// ── Palette & Theme (Pro Edition) ──────────────────────────────────────────
 const C = {
   bg: "#fffcfb",
   white: "#ffffff",
@@ -16,9 +16,9 @@ const C = {
   creamSoft: "#fff7ed",
   text: "#4a2c2a",
   textSoft: "#8c6d6a",
-  success: "#86efac",
-  warning: "#fdba74",
-  danger: "#fca5a5",
+  success: "#34d399",
+  warning: "#fbbf24",
+  danger: "#f87171",
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
@@ -29,13 +29,17 @@ function fmtTime(ts) {
   return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
 }
 
+function getDayName(ts) {
+  return new Date(ts).toLocaleDateString("he-IL", { weekday: 'short', day: 'numeric', month: 'numeric' });
+}
+
 function getTimeGap(ts1, ts2) {
   const diff = Math.abs(ts1 - ts2);
   const m = Math.floor(diff / 60000);
   if (m < 60) return `${m} דק׳`;
   const h = Math.floor(m / 60);
   const rm = m % 60;
-  return rm ? `${h}:${rm < 10 ? '0'+rm : rm} ש׳` : `${h} ש׳`;
+  return rm ? `${h}:${rm.toString().padStart(2, '0')} ש׳` : `${h} ש׳`;
 }
 
 // ── Main App ───────────────────────────────────────────────────────────────
@@ -75,7 +79,7 @@ export default function BabyApp() {
     if (ev.manualTime) {
       const [h, m] = ev.manualTime.split(':');
       const d = new Date();
-      d.setHours(h, m, 0, 0);
+      d.setHours(parseInt(h), parseInt(m), 0, 0);
       finalTs = d.getTime();
     }
     const docRef = await addDoc(collection(db, "events"), { ts: finalTs, user: userName, ...ev });
@@ -91,17 +95,19 @@ export default function BabyApp() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
-        .undo-toast { position: fixed; bottom: 95px; left: 20px; right: 20px; background: #333; color: white; padding: 14px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; z-index: 9999; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .undo-toast { position: fixed; bottom: 95px; left: 20px; right: 20px; background: #333; color: white; padding: 14px 20px; border-radius: 18px; display: flex; justify-content: space-between; align-items: center; z-index: 9999; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+        .slide-up { animation: slideUp 0.3s ease-out forwards; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
       `}</style>
 
       {showUndo && (
-        <div className="undo-toast">
-          <span>עודכן בהצלחה! ✨</span>
+        <div className="undo-toast slide-up">
+          <span style={{fontWeight: 700}}>עודכן בהצלחה! ✨</span>
           <button onClick={async () => { 
             if(undoAction.type==='event') await deleteDoc(doc(db,"events",undoAction.id));
             else await setDoc(doc(db, "settings", "vitaminD"), { lastDate: "" });
             setShowUndo(false); 
-          }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל (Undo)</button>
+          }} style={{color: C.peach, border:'none', background:'none', fontWeight:800, fontSize: 16}}>בטל (Undo)</button>
         </div>
       )}
 
@@ -116,7 +122,7 @@ export default function BabyApp() {
             setTimeout(() => setShowUndo(false), 5000);
           }}>
             <span>☀️ ויטמין D לעלמה</span>
-            <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.2)'}} />
+            <input type="checkbox" readOnly checked={false} style={{transform: 'scale(1.3)'}} />
           </div>
         )}
         <MainTimerWidget events={events} now={now} onOpenFutureFeeds={() => setModal("futureFeeds")} />
@@ -124,11 +130,13 @@ export default function BabyApp() {
 
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
+        {tab === "history" && <WeeklyHistory events={events} />}
         {tab === "tasks" && <ManagementView shopping={shopping} vouchers={vouchers} />}
       </div>
 
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ראשי</button>
+        <button onClick={() => setTab("history")} style={S.navBtn(tab === "history")}>📅 היסטוריה</button>
         <button onClick={() => setTab("tasks")} style={S.navBtn(tab === "tasks")}>📋 ניהול</button>
       </div>
 
@@ -143,6 +151,7 @@ export default function BabyApp() {
 
 function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const lastFeed = events.find(e => e.type === "feed");
+  
   if (!lastFeed) return (
     <div style={S.mainWidget}>
       <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>אכלה פעם אחרונה:</div>
@@ -153,32 +162,34 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
-  // Progress Bar Logic (Max 4 hours = 240 mins)
-  const maxMins = 240;
-  const progressPercent = Math.min((diffMin / maxMins) * 100, 100);
+  // Progress Logic (Target is 3.5 hours = 210 mins)
+  const targetMins = 210;
+  const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
   
-  // הצבע משתנה ככל שמתקרבים לארוחה הבאה
-  let progColor = C.success; // עד שעתיים וחצי - ירוק רגוע
-  if (diffMin > 150) progColor = "#facc15"; // שעתיים וחצי עד 3 - צהוב
-  if (diffMin > 180) progColor = C.warning; // 3 עד 3.5 שעות - כתום
-  if (diffMin > 210) progColor = "#ef4444"; // מעל 3.5 שעות - אדום רעב!
+  let progColor = C.success;
+  if (diffMin > 120) progColor = C.warning; // מעל שעתיים: כתום
+  if (diffMin > 180) progColor = C.danger;  // מעל 3 שעות: אדום
 
-  const nextStart = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000);
-  const nextEnd = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
+  const nextTarget = new Date(lastFeed.ts + 3.5 * 60 * 60 * 1000); // היעד הוא 3.5 שעות
   
   return (
     <div style={S.mainWidget}>
-      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 5}}>אכלה פעם אחרונה:</div>
-      <div className="kids-font" style={{fontSize: 42, fontWeight: 900, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
+      <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה פעם אחרונה:</div>
+      <div className="kids-font" style={{fontSize: 44, fontWeight: 900, color: 'white', textShadow: '0 2px 4px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
       
-      {/* מד התקדמות */}
-      <div style={{width: '100%', height: '6px', background: 'rgba(255,255,255,0.3)', borderRadius: '10px', marginTop: '10px', overflow: 'hidden'}}>
-        <div style={{width: `${progressPercent}%`, height: '100%', background: progColor, transition: 'width 0.5s ease', borderRadius: '10px'}}></div>
+      {/* Progress Bar */}
+      <div style={S.progressBarContainer}>
+        <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
       </div>
 
       <div style={{...S.nextFeedBox, cursor: 'pointer'}} onClick={onOpenFutureFeeds}>
-        <div style={{fontSize: 11, opacity: 0.9, marginBottom: 2}}>🎯 טווח האכלה משוער הבא:</div>
-        <div style={{fontSize: 16, fontWeight: 800}}>{fmtTime(nextStart)} - {fmtTime(nextEnd)} 👈</div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <div style={{fontSize: 11, opacity: 0.9, marginBottom: 2}}>🎯 ארוחה הבאה (משוער):</div>
+            <div style={{fontSize: 16, fontWeight: 800}}>{fmtTime(nextTarget.getTime())}</div>
+          </div>
+          <div style={{fontSize: 20, opacity: 0.8}}>👉</div>
+        </div>
       </div>
     </div>
   );
@@ -188,29 +199,26 @@ function FutureFeedsModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
 
-  // יצירת מערך של 8 האכלות עתידיות (24 שעות) במרווחים של 3-3.5 שעות
-  const futureFeeds = Array.from({length: 8}).map((_, i) => {
-    const start = new Date(lastFeed.ts + (i + 1) * 3 * 60 * 60 * 1000);
-    const end = new Date(lastFeed.ts + (i + 1) * 3.5 * 60 * 60 * 1000);
-    return { start, end };
+  // 12 hours forecast (4 intervals of 3.5 hours)
+  const futureFeeds = Array.from({length: 4}).map((_, i) => {
+    return new Date(lastFeed.ts + (i + 1) * 3.5 * 60 * 60 * 1000);
   });
 
   return (
     <div style={S.overlay} onClick={onClose}>
-      <div style={{...S.modal, maxHeight: '80vh', overflowY: 'auto'}} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', marginBottom:15, color:C.peachDark}}>תחזית האכלות 🍼</h3>
-        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 15}}>24 השעות הבאות (לפי מרווחי זמן של 3 עד 3.5 שעות)</p>
+      <div style={S.modal} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:C.peachDark}}>תחזית ל-12 שעות 🍼</h3>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>הזמנים מחושבים לפי מרווחים של 3.5 שעות מההאכלה האחרונה.</p>
         
-        <div style={{display:'flex', flexDirection:'column', gap: 10}}>
-          {futureFeeds.map((feed, index) => (
-            <div key={index} style={S.itemRow}>
-              <span style={{fontWeight: 800, color: C.textSoft}}>ארוחה {index + 1}:</span>
-              <span style={{fontWeight: 800, fontSize: 16}}>{fmtTime(feed.start)} - {fmtTime(feed.end)}</span>
+        <div style={{display:'flex', flexDirection:'column', gap: 12}}>
+          {futureFeeds.map((time, index) => (
+            <div key={index} style={{...S.itemRow, background: '#fef3c7', padding: '12px 15px', borderRadius: '15px', border: 'none'}}>
+              <span style={{fontWeight: 800, color: '#b45309'}}>ארוחה {index + 1}:</span>
+              <span style={{fontWeight: 900, fontSize: 18, color: '#92400e'}}>{fmtTime(time.getTime())}</span>
             </div>
           ))}
         </div>
-        
-        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, תודה</button>
       </div>
     </div>
   );
@@ -218,8 +226,13 @@ function FutureFeedsModal({ events, onClose }) {
 
 function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
-  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts));
-  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts));
+  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
+  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
+
+  // Daily Summaries
+  const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+  const totalPee = diapers.filter(e => e.pee).length;
+  const totalPoop = diapers.filter(e => e.poop).length;
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
@@ -230,7 +243,7 @@ function HomeView({ events, setModal, onDelete }) {
 
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
-        <div style={{display:'flex', gap:10}}>
+        <div style={{display:'flex', gap:12}}>
           
           <div style={S.column}>
             <div className="kids-font" style={S.columnHeader}>🍼 אוכל</div>
@@ -241,7 +254,7 @@ function HomeView({ events, setModal, onDelete }) {
                     <span style={S.eventTime}>{fmtTime(e.ts)}</span>
                     <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
                   </div>
-                  <input style={S.mlEditInput} value={e.ml || ""} placeholder="כמה ML?" onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} />
+                  <input style={S.mlEditInput} value={e.ml || ""} placeholder="ML" onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} />
                 </div>
                 {feeds[i+1] && (
                   <div style={S.chainContainer}>
@@ -251,6 +264,12 @@ function HomeView({ events, setModal, onDelete }) {
                 )}
               </div>
             ))}
+            {feeds.length > 0 && (
+              <div style={S.summaryBarSmall}>
+                <div style={{fontWeight: 800, fontSize: 16, color: C.peachDark}}>{totalMl} מ"ל</div>
+                <div style={{color: C.textSoft}}>סה"כ {feeds.length} ארוחות</div>
+              </div>
+            )}
           </div>
 
           <div style={S.column}>
@@ -272,10 +291,77 @@ function HomeView({ events, setModal, onDelete }) {
                 )}
               </div>
             ))}
+            {diapers.length > 0 && (
+              <div style={S.summaryBarSmall}>
+                <div style={{fontWeight: 800, fontSize: 15, color: '#0369a1'}}>💧{totalPee} | 💩{totalPoop}</div>
+                <div style={{color: C.textSoft}}>סה"כ {diapers.length} חיתולים</div>
+              </div>
+            )}
           </div>
 
         </div>
       </div>
+    </div>
+  );
+}
+
+function WeeklyHistory({ events }) {
+  // Aggregate data by day
+  const daysMap = {};
+  events.forEach(e => {
+    const d = new Date(e.ts).toDateString();
+    if (!daysMap[d]) daysMap[d] = { ts: e.ts, ml: 0, count: 0 };
+    if (e.type === "feed") {
+      daysMap[d].ml += Number(e.ml || 0);
+      daysMap[d].count += 1;
+    }
+  });
+
+  const sortedDays = Object.values(daysMap).sort((a,b) => b.ts - a.ts).slice(0, 7);
+  const chartDays = [...sortedDays].reverse(); // Oldest to newest for graph
+  
+  // Find max for graph scaling
+  const maxMl = Math.max(...chartDays.map(d => d.ml), 800); // default min scale of 800
+
+  return (
+    <div style={{display:'flex', flexDirection:'column', gap:15}}>
+      
+      {/* Trend Graph */}
+      <div style={S.card}>
+        <div className="kids-font" style={{...S.cardTitle, marginBottom: 30}}>מגמת תזונה שבועית (מ"ל)</div>
+        <div style={S.chartWrapper}>
+          {chartDays.map((d, i) => {
+            const prev = chartDays[i-1];
+            const isUp = prev ? d.ml >= prev.ml : true;
+            const heightPercent = Math.max((d.ml / maxMl) * 100, 10); // min 10% height
+
+            return (
+              <div key={d.ts} style={S.chartColumn}>
+                <div style={{...S.chartBar, height: `${heightPercent}%`, background: isUp ? C.success : C.danger}}>
+                   <span style={S.chartVal}>{d.ml}</span>
+                </div>
+                <div style={S.chartLabel}>{getDayName(d.ts).split(' ')[0]}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div style={{textAlign:'center', fontSize:12, color:C.textSoft, marginTop:15, fontWeight: 700}}>
+          <span style={{color:C.success}}>▲ עליה</span> &nbsp;|&nbsp; <span style={{color:C.danger}}>▼ ירידה</span>
+        </div>
+      </div>
+
+      {/* Text Summary */}
+      <div style={S.card}>
+        <div className="kids-font" style={S.cardTitle}>פירוט יומי - אוכל</div>
+        {sortedDays.map(d => (
+          <div key={d.ts} style={S.summaryRow}>
+            <div style={{fontWeight:800, width:100}}>{getDayName(d.ts)}</div>
+            <div style={{flex:1, color:C.peachDark, fontWeight:800, fontSize: 16}}>🍼 {d.ml} מ"ל</div>
+            <div style={{fontSize:13, color:C.textSoft, fontWeight: 700}}>{d.count} ארוחות</div>
+          </div>
+        ))}
+      </div>
+
     </div>
   );
 }
@@ -288,37 +374,39 @@ function ManagementView({ shopping, vouchers }) {
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>🛒 השלמות וקניות</div>
-        <div style={{display:'flex', gap:5, marginBottom:10}}>
-          <select value={newShop.item} onChange={e=>setNewShop({...newShop, item:e.target.value})} style={S.input}>
+        <div style={{display:'flex', gap:8, marginBottom:10}}>
+          <select value={newShop.item} onChange={e=>setNewShop({...newShop, item:e.target.value})} style={{...S.input, flex: 2}}>
             <option>נוטרילון</option><option>מגבונים</option><option>חיתולים</option><option>אחר</option>
           </select>
-          <select value={newShop.qty} onChange={e=>setNewShop({...newShop, qty:e.target.value})} style={{...S.input, width:70}}>
+          <select value={newShop.qty} onChange={e=>setNewShop({...newShop, qty:e.target.value})} style={{...S.input, flex: 1}}>
             {[1,2,3,4,5].map(n => <option key={n}>{n}</option>)}
           </select>
         </div>
         {newShop.item === "אחר" && <input placeholder="שם המוצר..." value={newShop.other} onChange={e=>setNewShop({...newShop, other:e.target.value})} style={{...S.input, marginBottom:10}} />}
         <button onClick={()=>{addDoc(collection(db,"shopping"),{item: newShop.item==='אחר'?newShop.other:newShop.item, qty:newShop.qty, createdAt:Date.now()}); setNewShop({...newShop, other:""});}} style={S.primaryBtn}>הוסף לסל</button>
-        {shopping.map(s => (
-          <div key={s.id} style={S.itemRow}>
-            <span><b>{s.item}</b> (x{s.qty})</span>
-            <button onClick={()=>deleteDoc(doc(db,"shopping",s.id))} style={S.doneBtn}>נרכש ✓</button>
-          </div>
-        ))}
+        <div style={{marginTop: 15}}>
+          {shopping.map(s => (
+            <div key={s.id} style={S.itemRow}>
+              <span style={{fontSize: 16}}><b>{s.item}</b> (x{s.qty})</span>
+              <button onClick={()=>deleteDoc(doc(db,"shopping",s.id))} style={S.doneBtn}>נרכש ✓</button>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>🎫 מעקב תווים</div>
-        <div style={{display:'flex', gap:5, marginBottom:10}}>
-          <input placeholder="סוג התו" value={newVouch.name} onChange={e=>setNewVouch({...newVouch, name:e.target.value})} style={S.input} />
-          <input placeholder="יתרה" type="number" value={newVouch.balance} onChange={e=>setNewVouch({...newVouch, balance:e.target.value})} style={{...S.input, width:100}} />
-          <button onClick={()=>{addDoc(collection(db,"vouchers"),newVouch); setNewVouch({name:"",balance:""})}} style={{...S.primaryBtn, width:50}}>+</button>
+        <div style={{display:'flex', gap:8, marginBottom:15}}>
+          <input placeholder="סוג התו" value={newVouch.name} onChange={e=>setNewVouch({...newVouch, name:e.target.value})} style={{...S.input, flex: 2}} />
+          <input placeholder="יתרה" type="number" value={newVouch.balance} onChange={e=>setNewVouch({...newVouch, balance:e.target.value})} style={{...S.input, flex: 1}} />
+          <button onClick={()=>{addDoc(collection(db,"vouchers"),newVouch); setNewVouch({name:"",balance:""})}} style={{...S.primaryBtn, width: '60px', padding: 0}}>+</button>
         </div>
         {vouchers.map(v => (
-          <div key={v.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:'1px solid #eee'}}>
-            <span style={{fontWeight:800}}>{v.name}</span>
+          <div key={v.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #f1f5f9'}}>
+            <span style={{fontWeight:800, fontSize: 16}}>{v.name}</span>
             <div style={{display:'flex', alignItems:'center', gap:10}}>
-              <input type="number" value={v.balance} onChange={(e)=>updateDoc(doc(db,"vouchers",v.id), {balance: e.target.value})} style={{width:80, padding:5, border:'1px solid #ddd', borderRadius:8, textAlign:'center', fontWeight:800}} />
-              <button onClick={()=>deleteDoc(doc(db,"vouchers",v.id))} style={{border:'none', background:'none'}}>🗑️</button>
+              <input type="number" value={v.balance} onChange={(e)=>updateDoc(doc(db,"vouchers",v.id), {balance: e.target.value})} style={{width:80, padding:'8px 5px', border:'1px solid #e2e8f0', borderRadius:8, textAlign:'center', fontWeight:800, fontSize: 16}} />
+              <button onClick={()=>deleteDoc(doc(db,"vouchers",v.id))} style={{border:'none', background:'none', fontSize: 18}}>🗑️</button>
             </div>
           </div>
         ))}
@@ -370,36 +458,45 @@ function DiaperModal({ onConfirm, onClose }) {
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
+// ── Styles (Pro Edit) ──────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", zIndex: 10, boxShadow: "0 8px 20px rgba(232, 121, 249, 0.2)" },
-  greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.85, marginBottom: 5 },
-  babyBadge: { fontSize: 34, color: "white", fontWeight: 800, marginBottom: 15 },
-  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 18px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer' },
-  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(12px)", borderRadius: "25px", padding: "18px 15px", border: "1px solid rgba(255, 255, 255, 0.3)", display: "inline-block", width: "100%", maxWidth: "300px" },
-  nextFeedBox: { marginTop: 15, fontSize: 13, fontWeight: 800, color: "white", background: "rgba(0,0,0,0.15)", padding: "8px 15px", borderRadius: "15px" },
-  content: { flex: 1, overflowY: "auto", padding: "20px 15px 140px" }, // Increased padding-bottom to fix scroll cutoff
-  actionBtn: { flex: 1, border: "none", padding: "18px", borderRadius: "20px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS },
-  card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid ${C.border}`, marginBottom: 20 },
-  cardTitle: { fontSize: 18, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", zIndex: 10, boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
+  greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5 },
+  babyBadge: { fontSize: 36, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
+  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", display: "inline-block", width: "100%", maxWidth: "320px", boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
+  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.1)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
+  progressBarFill: { height: '100%', transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '10px' },
+  nextFeedBox: { marginTop: 15, color: "white", background: "rgba(0,0,0,0.15)", padding: "10px 15px", borderRadius: "15px", transition: 'background 0.2s' },
+  content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" }, // Padding fix for scrolling!
+  actionBtn: { flex: 1, border: "none", padding: "18px", borderRadius: "22px", fontSize: 18, fontWeight: 800, fontFamily: FONT_KIDS, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' },
+  card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid #f1f5f9`, marginBottom: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' },
+  cardTitle: { fontSize: 19, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
   column: { flex: 1, display: "flex", flexDirection: "column", gap: 0 },
-  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 14, padding: "8px", background: "#fff5f0", borderRadius: "10px", color: C.peachDark, marginBottom: 10 },
-  eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "10px", borderRadius: "15px", border: "1px solid #f1f5f9", zIndex: 2, position: 'relative' },
-  chainContainer: { display: 'flex', alignItems: 'center', marginTop: '-4px', marginBottom: '-4px', marginRight: '20px', height: '35px', zIndex: 1 },
-  chainCurve: { width: '15px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 15px 15px 0', marginLeft: '8px' },
+  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 15, padding: "8px", background: "#fff5f0", borderRadius: "12px", color: C.peachDark, marginBottom: 10 },
+  eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "12px", borderRadius: "18px", border: "1px solid #f8fafc", zIndex: 2, position: 'relative' },
+  chainContainer: { display: 'flex', alignItems: 'center', marginTop: '-6px', marginBottom: '-6px', marginRight: '20px', height: '40px', zIndex: 1 },
+  chainCurve: { width: '18px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 20px 20px 0', marginLeft: '10px', opacity: 0.8 },
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft },
-  mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.05)', borderRadius:8, textAlign:'center', fontWeight:800, fontSize:14, padding:6, marginTop:5 },
-  delBtn: { background:'none', border:'none', color: '#ccc', fontSize: 14 },
-  eventTime: { fontSize: 12, fontWeight: 800, color: C.textSoft },
-  eventDetail: { fontSize: 15, fontWeight: 700, marginTop: 5 },
-  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: C.bg, borderTop: `1px solid ${C.border}`, padding: "10px calc(10px + env(safe-area-inset-bottom))", zIndex: 999, boxShadow: "0 -4px 15px rgba(0,0,0,0.05)" },
-  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "12px", borderRadius: "15px", fontWeight: 800, color: active ? "white" : C.textSoft }),
-  input: { width: "100%", padding: "12px", borderRadius: "10px", border: `2px solid ${C.border}`, fontWeight: 700, fontSize: 16 },
-  primaryBtn: { width: "100%", padding: "15px", borderRadius: "20px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 17 },
-  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px dotted #eee' },
-  doneBtn: { background: C.success, border: 'none', borderRadius: '8px', padding: '6px 12px', fontWeight: 800, fontSize: 12 },
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
-  modal: { background: "white", padding: "25px", borderRadius: "30px", width: "90%", maxWidth: 350 },
-  chip: (active) => ({ flex: 1, padding: "10px", borderRadius: "10px", border: active ? `2px solid ${C.peach}` : "1px solid #ddd", background: active ? C.creamSoft : "white", fontWeight: 700 }),
+  summaryBarSmall: { marginTop: 15, padding: "12px 5px", background: "#f8fafc", borderRadius: "15px", fontSize: 11, textAlign: "center", border: "1px solid #f1f5f9" },
+  chartWrapper: { display: "flex", alignItems: "flex-end", justifyContent: "space-around", height: 180, padding: "10px 5px", borderBottom: "2px solid #f1f5f9" },
+  chartColumn: { display: "flex", flexDirection: "column", alignItems: "center", flex: 1, height: "100%" },
+  chartBar: { width: "65%", borderRadius: "8px 8px 0 0", display: "flex", justifyContent: "center", position: "relative", transition: "height 0.6s cubic-bezier(0.4, 0, 0.2, 1)" },
+  chartVal: { position: "absolute", top: -22, fontSize: 11, fontWeight: 800, color: C.text },
+  chartLabel: { fontSize: 11, marginTop: 10, fontWeight: 800, color: C.textSoft },
+  mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:8, textAlign:'center', fontWeight:800, fontSize:15, padding:8, marginTop:8 },
+  delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer' },
+  eventTime: { fontSize: 13, fontWeight: 800, color: C.textSoft },
+  eventDetail: { fontSize: 16, fontWeight: 700, marginTop: 5 },
+  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", borderTop: `1px solid #f1f5f9`, padding: "12px calc(12px + env(safe-area-inset-bottom))", zIndex: 9999, boxShadow: "0 -5px 20px rgba(0,0,0,0.06)" },
+  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "14px", borderRadius: "18px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 15, transition: 'background 0.2s' }),
+  input: { width: "100%", padding: "14px", borderRadius: "12px", border: `2px solid #f1f5f9`, fontWeight: 700, fontSize: 16, background: '#f8fafc' },
+  primaryBtn: { width: "100%", padding: "16px", borderRadius: "20px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18, boxShadow: '0 4px 12px rgba(244, 165, 138, 0.3)' },
+  itemRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px dotted #e2e8f0' },
+  doneBtn: { background: C.success, color: 'white', border: 'none', borderRadius: '10px', padding: '8px 14px', fontWeight: 800, fontSize: 13 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 },
+  modal: { background: "white", padding: "30px 25px", borderRadius: "35px", width: "90%", maxWidth: 360, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' },
+  chip: (active) => ({ flex: 1, padding: "12px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
+  summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #f8fafc' }
 };
