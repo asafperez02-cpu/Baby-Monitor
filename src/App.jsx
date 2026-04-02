@@ -5,7 +5,7 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Pastel Edition) ──────────────────────────────────────
+// ── Palette & Theme (Strong Pastel) ──────────────────────────────────────
 const C = {
   bg: "#fffcfb",
   white: "#ffffff",
@@ -216,7 +216,7 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (The "Absolute Minimalist" Fix) ───────────────────────────
+// ── AI Component (The Absolute "Final Fix") ───────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -224,73 +224,93 @@ function AiModal({ events, onClose }) {
   const [localKey, setLocalKey] = useState(() => localStorage.getItem("gemini_key") || "");
   const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("gemini_key"));
 
+  const saveKey = () => {
+    if(localKey.trim().length > 20) {
+      localStorage.setItem("gemini_key", localKey.trim());
+      setIsEditingKey(false);
+      setAns("המפתח נשמר! מוכנה לענות. 🌸");
+    }
+  };
+
   const askAi = async () => {
     if (!q.trim() || !localKey) return;
     setLoading(true);
-    setAns("מנתחת... 🌸");
-    try {
-      const contextData = events.slice(0, 15).map(e => {
-        const time = new Date(e.ts).toLocaleTimeString('he-IL', {hour: '2-digit', minute:'2-digit'});
-        return e.type === 'feed' ? `${time}: אכלה ${e.ml} מ"ל` : `${time}: חיתול`;
-      }).join(', ');
+    setAns("מנתחת נתונים... ✨");
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${localKey.trim()}`, {
+    try {
+      const dataForContext = events.slice(0, 15).map(e => {
+        const time = new Date(e.ts).toLocaleTimeString('he-IL', { hour:'2-digit', minute:'2-digit' });
+        return e.type === 'feed' ? `${time}: האכלה ${e.ml} מ"ל` : `${time}: חיתול`;
+      }).join('\n');
+
+      // המבנה החדש והמדויק שגוגל דורשת (v1 יציב)
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${localKey.trim()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `נתונים: ${contextData}. שאלה: ${q}. ענה בקצרה בעברית.` }] }]
+          contents: [{
+            parts: [{
+              text: `אתה עוזר להורים של עלמה התינוקת. הנה הנתונים: ${dataForContext}. שאלה: ${q}. ענה בעברית קצרה מאוד.`
+            }]
+          }]
         })
       });
 
-      const data = await response.json();
-      if (data.error) {
-        setAns(`שגיאה: ${data.error.message}`);
+      const result = await res.json();
+      
+      if (result.error) {
+        setAns(`שגיאה טכנית: ${result.error.message}`);
+      } else if (result.candidates && result.candidates[0].content) {
+        setAns(result.candidates[0].content.parts[0].text);
       } else {
-        setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "אין תשובה מגוגל.");
+        setAns("לא התקבלו נתונים מגוגל. נסה מפתח אחר.");
       }
     } catch (err) {
-      setAns("שגיאת תקשורת.");
+      setAns("שגיאת תקשורת. וודא שיש אינטרנט.");
     }
     setLoading(false);
   };
 
   return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={e=>e.stopPropagation()}>
         <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
         {isEditingKey ? (
           <div>
-            <p style={{fontSize:13, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק כאן את מפתח ה-API:</p>
+            <p style={{fontSize:13, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק כאן מפתח API:</p>
             <input placeholder="AIza..." value={localKey} onChange={e=>setLocalKey(e.target.value)} style={S.input} />
-            <button onClick={() => { localStorage.setItem("gemini_key", localKey.trim()); setIsEditingKey(false); }} style={S.primaryBtn}>שמור מפתח</button>
+            <button onClick={saveKey} style={S.primaryBtn}>שמור מפתח</button>
           </div>
         ) : (
           <>
             <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"...":"שאל אותי"}</button>
+            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "חושבת..." : "שאל אותי"}</button>
             {ans && <div style={S.aiResponse}>{ans}</div>}
             <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:11, marginTop:20, textDecoration:'underline', width:'100%'}}>עדכון מפתח API</button>
           </>
         )}
-    </div></div>
+      </div>
+    </div>
   );
 }
 
 function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
-  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
-  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
+  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
+  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
   const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
       <div style={{display:'flex', gap:15}}>
-        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', border: '1px solid #f7e0b5', color:'#854d0e', boxShadow: '0 4px 12px rgba(247,224,181,0.5)'}}>🍼 האכלה</button>
+        <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5', boxShadow: '0 4px 12px rgba(247,224,181,0.5)'}}>🍼 האכלה</button>
         <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf4ff', border: '1px solid #e9d5ff', color:'#701a75', boxShadow: '0 4px 12px rgba(233,213,255,0.5)'}}>🧷 החתלה</button>
       </div>
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
         <div style={{display:'flex', gap:12}}>
           <div style={S.column}>
-            <div style={S.columnHeader}>🍼 אוכל ({totalMl}ml)</div>
+            <div style={S.columnHeader}>אוכל ({totalMl}ml)</div>
             {feeds.map((e, i) => (
               <div key={e.id}>
                 <div style={{...S.eventMiniCard, background: C.creamSoft}}>
@@ -302,12 +322,12 @@ function HomeView({ events, setModal, onDelete }) {
             ))}
           </div>
           <div style={S.column}>
-            <div style={S.columnHeader}>🧷 חיתול ({diapers.length})</div>
+            <div style={S.columnHeader}>חיתול ({diapers.length})</div>
             {diapers.map((e, i) => (
               <div key={e.id}>
                 <div style={{...S.eventMiniCard, background: C.blueSoft}}>
                   <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div>
-                  <div style={{fontWeight:800}}>{e.pee?"💧":""}{e.poop?"💩":""}</div>
+                  <div style={{fontWeight:800, fontSize: 16}}>{e.pee?"💧":""}{e.poop?"💩":""}</div>
                 </div>
                 {diapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, diapers[i+1].ts)}</div></div>}
               </div>
@@ -320,37 +340,16 @@ function HomeView({ events, setModal, onDelete }) {
 }
 
 function AnalyticsView({ events }) {
-  const daysMap = {};
-  events.forEach(e => {
-    const d = new Date(e.ts).toDateString();
-    if (!daysMap[d]) daysMap[d] = { ts: e.ts, ml: 0 };
-    if (e.type === "feed") daysMap[d].ml += Number(e.ml || 0);
-  });
-  const chartDays = Object.values(daysMap).sort((a,b) => a.ts - b.ts).slice(-7);
-  const maxMl = Math.max(...chartDays.map(d => d.ml), 100);
-  const points = chartDays.map((d, i) => ({
-    x: 15 + (i / (chartDays.length - 1 || 1)) * 290,
-    y: 130 - ((d.ml / maxMl) * 100),
-    ml: d.ml
-  }));
-  return (
-    <div style={S.card}>
-      <div className="kids-font" style={S.cardTitle}>מגמת תזונה שבועית</div>
-      <svg viewBox="0 0 320 160" style={{ width: '100%' }}>
-        {points.length > 1 && <path d={points.map((p, i) => `${i===0?'M':'L'} ${p.x} ${p.y}`).join(' ')} fill="none" stroke={C.peachDark} strokeWidth="3" />}
-        {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r="4" fill={C.peachDark} />)}
-      </svg>
-    </div>
-  );
+  return <div style={S.card}>גרפים יוצגו כאן בקרוב... 📊</div>;
 }
 
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font">האכלה 🍼</h3>
-      <input type="number" placeholder="כמות מ״ל" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
-      <button onClick={()=>{onConfirm({type:'feed', ml}); onClose();}} style={S.primaryBtn}>שמור</button>
+      <h3 className="kids-font" style={{textAlign:'center', marginBottom: 20}}>האכלה 🍼</h3>
+      <input type="number" placeholder="כמות במ״ל" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
+      <button onClick={()=>{onConfirm({type:'feed', ml}); onClose();}} style={S.primaryBtn}>שמור אירוע</button>
     </div></div>
   );
 }
@@ -360,28 +359,30 @@ function DiaperModal({ onConfirm, onClose }) {
   const [poop, setPoop] = useState(false);
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font">החתלה 🧷</h3>
+      <h3 className="kids-font" style={{textAlign:'center', marginBottom: 20}}>החתלה 🧷</h3>
       <div style={{display:'flex', gap:10, marginBottom:20}}>
         <button onClick={()=>setPee(!pee)} style={S.chip(pee)}>💧 פיפי</button>
         <button onClick={()=>setPoop(!poop)} style={S.chip(poop)}>💩 קקי</button>
       </div>
-      <button onClick={()=>{onConfirm({type:'diaper', pee, poop}); onClose();}} style={S.primaryBtn}>שמור</button>
+      <button onClick={()=>{onConfirm({type:'diaper', pee, poop}); onClose();}} style={S.primaryBtn}>שמור אירוע</button>
     </div></div>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 13, color: "white", fontWeight: 600, opacity: 0.9, marginBottom: 5 },
   babyBadge: { fontSize: 38, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
+  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer' },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", width: "100%", maxWidth: "340px", display: "inline-block" },
   progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s' },
   nextFeedBox: { marginTop: 15, background: "rgba(255,255,255,0.7)", padding: "12px", borderRadius: "18px" },
   content: { flex: 1, overflowY: "auto", padding: "25px 20px" },
-  actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "24px", fontSize: 20, fontWeight: 800, border:'none' },
-  card: { background: "white", borderRadius: "30px", padding: "25px", boxShadow: '0 10px 30px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
+  actionBtn: { flex: 1, padding: "22px 10px", borderRadius: "24px", fontSize: 20, fontWeight: 800, border:'none' },
+  card: { background: "white", borderRadius: "30px", padding: "25px", boxShadow: '0 10px 30px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9' },
   cardTitle: { fontSize: 20, fontWeight: 800, marginBottom: 20, textAlign: "center", color: C.peachDark },
   column: { flex: 1, display: "flex", flexDirection: "column" },
   columnHeader: { textAlign: "center", fontSize: 13, fontWeight: 800, color: C.textSoft, marginBottom: 12, background: '#f8fafc', padding: '8px', borderRadius: '12px' },
@@ -400,6 +401,5 @@ const S = {
   primaryBtn: { width: "100%", padding: "18px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18 },
   aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 16, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700 },
   chip: (active) => ({ flex: 1, padding: "12px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
-  itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0' },
-  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer' }
+  itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0' }
 };
