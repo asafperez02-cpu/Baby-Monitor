@@ -95,6 +95,8 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
+      <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
+
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 יומן</button>
         <button onClick={() => setTab("analytics")} style={S.navBtn(tab === "analytics")}>📊 נתונים</button>
@@ -103,6 +105,7 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -204,8 +207,8 @@ function AnalyticsView({ events }) {
     return { ...d, x, y };
   });
 
-  const pathData = points.length > 1 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') : "";
-  const fillPath = points.length > 1 ? `${pathData} L ${points[points.length-1].x} ${svgHeight} L ${points[0].x} ${svgHeight} Z` : "";
+  const pathData = points.length > 0 ? points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ') : "";
+  const fillPath = points.length > 0 ? `${pathData} L ${points[points.length-1].x} ${svgHeight} L ${points[0].x} ${svgHeight} Z` : "";
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
@@ -247,6 +250,42 @@ function AnalyticsView({ events }) {
   );
 }
 
+// ── AI Component (The Restoration) ────────────────────────────────────────
+function AiModal({ events, onClose }) {
+  const [q, setQ] = useState("");
+  const [ans, setAns] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const askAi = async () => {
+    if (!q.trim()) return;
+    setLoading(true); setAns("מנתחת נתונים... 🌸");
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_KEY;
+      if (!apiKey) { setAns("שגיאת מערכת: המפתח לא הוגדר בוורסל."); setLoading(false); return; }
+      
+      const history = events.slice(0, 20).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `נתונים על התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה מאוד.` }] }] })
+      });
+      const data = await res.json();
+      setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "לא הצלחתי להבין את הנתונים.");
+    } catch (err) { setAns("שגיאת תקשורת."); }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
+      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
+      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
+      {ans && <div style={S.aiResponse}>{ans}</div>}
+      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
+    </div></div>
+  );
+}
+
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
   return (
@@ -284,7 +323,6 @@ function ForecastModal({ events, onClose }) {
   );
 }
 
-// ── Styles (Strict Precision) ──────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
@@ -305,7 +343,9 @@ const S = {
   delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 16 },
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 },
+  aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
+  aiResponse: { marginTop: 15, padding: "15px", background: C.creamSoft, borderRadius: "15px", fontSize: 15, fontWeight: 700, color: C.text, border: `1px solid ${C.border}` },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "92%", maxWidth: 380 },
   input: { width: "100%", padding: "18px", borderRadius: "18px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 22, fontWeight: 700 },
   primaryBtn: { width: "100%", padding: "20px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 19 },
