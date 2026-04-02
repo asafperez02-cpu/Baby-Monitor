@@ -2,12 +2,12 @@
   "short_name": "עלמה",
   "name": "המעקב של עלמה",
   "start_url": ".",
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#f4a58a",
   "icons": [
     {
-      "src": "alma.png",
+      "src": "alma.png?v=2",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
