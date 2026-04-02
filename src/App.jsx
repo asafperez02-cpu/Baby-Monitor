@@ -5,67 +5,48 @@ import {
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Premium Pastel Edition) ─────────────────────────────
+// ── Palette & Theme (Original Premium Pastel) ──────────────────────────────
 const C = {
-  bg: "#fffcfb",
-  white: "#ffffff",
-  border: "#f7d7c4",
-  peach: "#f4a58a",
-  peachDark: "#e8845e",
-  blueSoft: "#e0f2fe",
-  creamSoft: "#fff7ed",
-  text: "#4a2c2a",
-  textSoft: "#8c6d6a",
-  success: "#34d399",
-  warning: "#fbbf24",
-  danger: "#f87171",
+  bg: "#fffcfb", white: "#ffffff", border: "#f7d7c4", peach: "#f4a58a",
+  peachDark: "#e8845e", blueSoft: "#e0f2fe", creamSoft: "#fff7ed",
+  text: "#4a2c2a", textSoft: "#8c6d6a", success: "#34d399", warning: "#fbbf24", danger: "#f87171",
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
 const FONT_KIDS = "'Varela Round', sans-serif"; 
 
 // ── Helpers ────────────────────────────────────────────────────────────────
-function fmtTime(ts) {
-  return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
-}
-function getHebrewDay(ts) {
-  const days = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת'];
-  return `יום ${days[new Date(ts).getDay()]}`;
-}
-function fmtDateShort(ts) {
-  return new Date(ts).toLocaleDateString("he-IL", { day: '2-digit', month: '2-digit' });
-}
+function fmtTime(ts) { return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }); }
+function getHebrewDay(ts) { const days = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת']; return `יום ${days[new Date(ts).getDay()]}`; }
+function fmtDateShort(ts) { return new Date(ts).toLocaleDateString("he-IL", { day: '2-digit', month: '2-digit' }); }
 function getTimeGap(ts1, ts2) {
-  const diff = Math.abs(ts1 - ts2);
-  const m = Math.floor(diff / 60000);
+  const m = Math.floor(Math.abs(ts1 - ts2) / 60000);
   if (m < 60) return `${m} דק׳`;
-  const h = Math.floor(m / 60);
-  const rm = m % 60;
-  return rm ? `${h}:${rm.toString().padStart(2, '0')} ש׳` : `${h} ש׳`;
+  return `${Math.floor(m / 60)}:${(m % 60).toString().padStart(2, '0')} ש׳`;
 }
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function BabyApp() {
   const [events, setEvents] = useState([]);
+  const [vitaminDone, setVitaminDone] = useState(false);
   const [tab, setTab] = useState("home");
   const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
   const [modal, setModal] = useState(null);
   const [now, setNow] = useState(Date.now());
-  const [showUndo, setShowUndo] = useState(false);
-  const [undoId, setUndoId] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 60000);
     const qEvents = query(collection(db, "events"), orderBy("ts", "desc"));
-    const unsub = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    return () => { clearInterval(timer); unsub(); };
+    const unsubEvents = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const unsubVit = onSnapshot(doc(db, "settings", "vitaminD"), d => {
+      setVitaminDone(d.exists() && d.data().lastDate === new Date().toDateString());
+    });
+    return () => { clearInterval(timer); unsubEvents(); unsubVit(); };
   }, []);
 
   const addEvent = async (ev) => {
     if ("vibrate" in navigator) navigator.vibrate(40);
-    const docRef = await addDoc(collection(db, "events"), { ts: Date.now(), user: userName, ...ev });
-    setUndoId(docRef.id); setShowUndo(true);
-    setTimeout(() => setShowUndo(false), 5000);
+    await addDoc(collection(db, "events"), { ts: Date.now(), user: userName, ...ev });
   };
 
   return (
@@ -77,16 +58,19 @@ export default function BabyApp() {
         .kids-font { font-family: ${FONT_KIDS} !important; }
       `}</style>
 
-      {showUndo && (
-        <div style={S.undoToast}>
-          <span>עודכן! ✨</span>
-          <button onClick={async () => { await deleteDoc(doc(db,"events",undoId)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל</button>
-        </div>
-      )}
-
       <div style={S.headerContainer}>
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
+        
+        {!vitaminDone && (
+          <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => {
+            setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
+          }}>
+            <span>☀️ ויטמין D לעלמה</span>
+            <input type="checkbox" readOnly checked={false} style={{transform:'scale(1.2)'}} />
+          </div>
+        )}
+
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
       </div>
 
@@ -94,8 +78,6 @@ export default function BabyApp() {
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
-
-      <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 יומן</button>
@@ -105,7 +87,6 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -114,9 +95,17 @@ export default function BabyApp() {
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
-  if (!lastFeed) return null;
+  if (!lastFeed) return <div style={S.mainWidget}><div className="kids-font" style={{fontSize: 42, color: 'white'}}>--</div></div>;
+  
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
+  
+  const targetMins = 240;
+  const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
+  let progColor = C.success;
+  if (diffMin > 150) progColor = C.warning;
+  if (diffMin > 210) progColor = C.danger;
+
   const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
 
   return (
@@ -124,12 +113,18 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
       <div style={{fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה לפני:</div>
       <div className="kids-font" style={{fontSize: 52, fontWeight: 900, color: 'white', textShadow: '0 2px 10px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
       
+      <div style={S.progressBarContainer}>
+        <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
+      </div>
+
       <div style={{display:'flex', justifyContent:'center', marginTop: 15}}>
         <button onClick={onOpenForecast} style={S.forecastBtn}>
-          <span style={{fontSize: 18}}>⏰</span>
-          <span style={{fontSize: 15, fontWeight: 700, color: C.textSoft}}>ארוחה הבאה:</span>
-          <span style={{fontSize: 19, fontWeight: 900, color: C.text}}>{fmtTime(nextTarget.getTime())}</span>
-          <span style={S.forecastBadge}>תחזית</span>
+          <div style={{display:'flex', alignItems:'center', justifyContent:'center', gap: 10, width:'100%'}}>
+             <span style={{fontSize: 18}}>⏰</span>
+             <span style={{fontSize: 15, fontWeight: 700, color: C.textSoft}}>ארוחה הבאה:</span>
+             <span style={{fontSize: 19, fontWeight: 900, color: C.text}}>{fmtTime(nextTarget.getTime())}</span>
+             <span style={S.forecastBadge}>תחזית</span>
+          </div>
         </button>
       </div>
     </div>
@@ -138,9 +133,11 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
 
 function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
-  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
-  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a,b)=>b.ts-a.ts);
+  const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
+  const diapers = events.filter(e => e.type === "diaper" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
+  
   const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+  const totalDiapers = diapers.length;
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
@@ -150,10 +147,12 @@ function HomeView({ events, setModal, onDelete }) {
       </div>
 
       <div style={S.card}>
-        <div className="kids-font" style={S.cardTitle}>היום של עלמה ({totalMl} מ"ל)</div>
-        <div style={{display:'flex', gap:12}}>
+        <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
+        <div style={S.summaryText}>סה"כ: <b>{totalMl} מ"ל</b> אוכל | <b>{totalDiapers}</b> החלפות</div>
+        
+        <div style={{display:'flex', gap:12, marginTop: 15}}>
           <div style={{flex:1}}>
-            <div style={S.columnHeader}>🍼 אוכל</div>
+            <div style={S.columnHeader}>🍼</div>
             {feeds.map((e, i) => (
               <div key={e.id}>
                 <div style={{...S.eventMiniCard, background: C.creamSoft}}>
@@ -161,14 +160,20 @@ function HomeView({ events, setModal, onDelete }) {
                     <span style={{fontWeight: 800, fontSize: 13, color: C.textSoft}}>{fmtTime(e.ts)}</span>
                     <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
                   </div>
-                  <div style={{fontWeight: 900, fontSize: 18, marginTop: 4}}>{e.ml} מ"ל</div>
+                  <input 
+                    style={S.mlEditInput} 
+                    value={e.ml || ""} 
+                    placeholder="ML" 
+                    onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} 
+                  />
                 </div>
                 {feeds[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, feeds[i+1].ts)}</div></div>}
               </div>
             ))}
           </div>
+
           <div style={{flex:1}}>
-            <div style={S.columnHeader}>🧷 חיתול</div>
+            <div style={S.columnHeader}>🧷</div>
             {diapers.map((e, i) => (
               <div key={e.id}>
                 <div style={{...S.eventMiniCard, background: C.blueSoft}}>
@@ -176,7 +181,7 @@ function HomeView({ events, setModal, onDelete }) {
                     <span style={{fontWeight: 800, fontSize: 13, color: C.textSoft}}>{fmtTime(e.ts)}</span>
                     <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
                   </div>
-                  <div style={{fontSize: 20, marginTop: 4}}>🧷</div>
+                  <div style={{fontSize: 20, marginTop: 4}}>{e.pee?"💧":""}{e.poop?"💩":""}</div>
                 </div>
                 {diapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, diapers[i+1].ts)}</div></div>}
               </div>
@@ -241,48 +246,12 @@ function AnalyticsView({ events }) {
         <div className="kids-font" style={S.cardTitle}>פירוט יומי</div>
         {sortedDays.map(d => (
           <div key={d.ts} style={S.summaryRow}>
-            <span style={{fontWeight:700, fontSize: 15}}>{getHebrewDay(d.ts)} <small style={{fontWeight:400, color:C.textSoft}}>({fmtDateShort(d.ts)})</small></span>
+            <span style={{fontWeight:700}}>{getHebrewDay(d.ts)} <small>({fmtDateShort(d.ts)})</small></span>
             <span style={{color:C.peachDark, fontWeight:900, fontSize:17}}>🍼 {d.ml} מ"ל</span>
           </div>
         ))}
       </div>
     </div>
-  );
-}
-
-// ── AI Component (The Restoration) ────────────────────────────────────────
-function AiModal({ events, onClose }) {
-  const [q, setQ] = useState("");
-  const [ans, setAns] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const askAi = async () => {
-    if (!q.trim()) return;
-    setLoading(true); setAns("מנתחת נתונים... 🌸");
-    try {
-      const apiKey = import.meta.env.VITE_GEMINI_KEY;
-      if (!apiKey) { setAns("שגיאת מערכת: המפתח לא הוגדר בוורסל."); setLoading(false); return; }
-      
-      const history = events.slice(0, 20).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `נתונים על התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה מאוד.` }] }] })
-      });
-      const data = await res.json();
-      setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "לא הצלחתי להבין את הנתונים.");
-    } catch (err) { setAns("שגיאת תקשורת."); }
-    setLoading(false);
-  };
-
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
-      {ans && <div style={S.aiResponse}>{ans}</div>}
-      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
-    </div></div>
   );
 }
 
@@ -298,10 +267,16 @@ function FeedModal({ onConfirm, onClose }) {
 }
 
 function DiaperModal({ onConfirm, onClose }) {
+  const [pee, setPee] = useState(true);
+  const [poop, setPoop] = useState(false);
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>החתלה 🧷</h3>
-      <button onClick={()=>{onConfirm({type:'diaper'}); onClose();}} style={S.primaryBtn}>הוחלף בהצלחה</button>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, marginBottom: 20}}>החתלה 🧷</h3>
+      <div style={{display:'flex', gap:10, marginBottom:20}}>
+        <button onClick={()=>setPee(!pee)} style={S.chip(pee)}>💧 פיפי</button>
+        <button onClick={()=>setPoop(!poop)} style={S.chip(poop)}>💩 קקי</button>
+      </div>
+      <button onClick={()=>{onConfirm({type:'diaper', pee, poop}); onClose();}} style={S.primaryBtn}>שמור</button>
     </div></div>
   );
 }
@@ -328,25 +303,29 @@ const S = {
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 13, color: "white", fontWeight: 700, opacity: 0.9, marginBottom: 5 },
   babyBadge: { fontSize: 44, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
-  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "35px", padding: "20px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
+  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "35px", padding: "20px", display: "inline-block", width: "100%", maxWidth: "360px", border: '1px solid rgba(255,255,255,0.3)' },
+  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
+  progressBarFill: { height: '100%', transition: 'width 0.8s ease' },
   forecastBtn: { background: "white", border: "none", width: "100%", padding: "16px", borderRadius: "22px", boxShadow: "0 8px 20px rgba(0,0,0,0.08)", cursor: "pointer", display:'flex', alignItems:'center', justifyContent:'center', gap: 10 },
   forecastBadge: { background: C.peach, color: 'white', borderRadius: '10px', padding: '4px 12px', fontSize: 12, fontWeight: 800, marginLeft: 'auto' },
   content: { flex: 1, overflowY: "auto", padding: "25px 15px 120px" },
   actionBtn: { flex: 1, padding: "24px", borderRadius: "26px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)' },
   card: { background: "white", borderRadius: "32px", padding: "25px", boxShadow: '0 4px 20px rgba(0,0,0,0.02)', border:'1px solid #f1f5f9', marginBottom: 20 },
-  cardTitle: { fontSize: 21, fontWeight: 800, marginBottom: 22, textAlign: "center", color: C.peachDark },
-  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 15, padding: "10px", background: "#f8fafc", borderRadius: "14px", color: C.textSoft, marginBottom: 18 },
+  cardTitle: { fontSize: 21, fontWeight: 800, marginBottom: 5, textAlign: "center", color: C.peachDark },
+  summaryText: { textAlign: 'center', fontSize: 14, color: C.textSoft, marginBottom: 20 },
+  columnHeader: { textAlign: "center", fontWeight: 800, fontSize: 22, padding: "10px", background: "#f8fafc", borderRadius: "14px", color: C.textSoft, marginBottom: 18 },
   eventMiniCard: { display: "flex", flexDirection: "column", alignItems: "center", padding: "15px", borderRadius: "22px", border: "1px solid #f1f5f9" },
+  mlEditInput: { width: '100%', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:8, textAlign:'center', fontWeight:900, fontSize:17, padding:8, marginTop:4, color: C.text },
   chainContainer: { display: 'flex', alignItems: 'center', height: '40px', marginRight: '20px' },
   chainCurve: { width: '18px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 18px 18px 0', opacity: 0.5 },
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft, marginRight: 10 },
   delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 16 },
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
-  aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
-  aiResponse: { marginTop: 15, padding: "15px", background: C.creamSoft, borderRadius: "15px", fontSize: 15, fontWeight: 700, color: C.text, border: `1px solid ${C.border}` },
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
+  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "92%", maxWidth: 380 },
+  chip: (active) => ({ flex: 1, padding: "14px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
   input: { width: "100%", padding: "18px", borderRadius: "18px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 22, fontWeight: 700 },
   primaryBtn: { width: "100%", padding: "20px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 19 },
   summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #f9fafb' },
