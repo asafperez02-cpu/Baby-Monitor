@@ -139,7 +139,7 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      <button onClick={() => setModal("ai")} style={S.aiFab}>✨</button>
+      <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ראשי</button>
