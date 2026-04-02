@@ -139,6 +139,7 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
+      {/* כפתור ה-AI הענק והמרחף השקוף */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
@@ -232,7 +233,7 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component ────────────────────────────────────────────────────────────
+// ── AI Component (Pastel Edition) ───────────────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -241,10 +242,9 @@ function AiModal({ events, onClose }) {
   const askAi = async () => {
     if (!q.trim()) return;
     setLoading(true);
-    setAns("חושב... 🧠");
+    setAns("חושבת... 🌸");
 
     try {
-      // משיכת המפתח מתוך קובץ ההגדרות
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
       if (!apiKey) {
@@ -253,7 +253,6 @@ function AiModal({ events, onClose }) {
         return;
       }
 
-      // הכנת "גיליון הנתונים" עבור ה-AI - ניקח את 20 האירועים האחרונים
       const contextData = events.slice(0, 20).map(e => {
         const time = new Date(e.ts).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
         if (e.type === 'feed') return `[${time}] האכלה: ${e.ml} מ"ל`;
@@ -291,8 +290,8 @@ ${contextData}
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:'#a855f7'}}>העוזרת של עלמה ✨</h3>
-        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>ה-AI מנתח את הפעולות האחרונות</p>
+        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:C.peachDark}}>העוזרת של עלמה ✨</h3>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל, ה-AI מנתח את הפעולות האחרונות</p>
         
         <input 
           placeholder="למשל: כמה עלמה אכלה היום?" 
@@ -302,12 +301,12 @@ ${contextData}
           onKeyDown={(e) => e.key === 'Enter' && askAi()}
         />
         
-        <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, background: loading ? '#d8b4fe' : '#a855f7', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'}}>
-          {loading ? "מנתח..." : "שאל"}
+        <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, background: loading ? '#fcd34d' : C.peach, boxShadow: '0 4px 12px rgba(244, 165, 138, 0.3)'}}>
+          {loading ? "מנתחת..." : "שאל אותי"}
         </button>
         
         {ans && (
-          <div style={{marginTop: 20, padding: 15, background: '#f3e8ff', borderRadius: 12, fontSize: 15, fontWeight: 700, color: '#6b21a8', lineHeight: '1.5', border: '1px solid #e9d5ff'}}>
+          <div style={{marginTop: 20, padding: 15, background: C.creamSoft, borderRadius: 12, fontSize: 15, fontWeight: 700, color: C.text, lineHeight: '1.5', border: `1px solid ${C.border}`}}>
             {ans}
           </div>
         )}
@@ -483,7 +482,6 @@ function AnalyticsView({ events }) {
   );
 }
 
-// ... FeedModal & DiaperModal unchanged
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
   const [timeMode, setTimeMode] = useState("now");
@@ -563,5 +561,5 @@ const S = {
   modal: { background: "white", padding: "30px 25px", borderRadius: "35px", width: "90%", maxWidth: 360, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' },
   chip: (active) => ({ flex: 1, padding: "12px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
   summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #f8fafc' },
-  aiFab: { position: 'fixed', bottom: 90, left: 20, background: '#a855f7', color: 'white', border: 'none', borderRadius: '50%', width: 56, height: 56, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(168, 85, 247, 0.4)', zIndex: 9998, cursor: 'pointer' }
+  aiFab: { position: 'fixed', bottom: 90, left: 20, background: 'transparent', border: 'none', fontSize: 48, zIndex: 9998, cursor: 'pointer', filter: 'drop-shadow(0px 8px 12px rgba(0,0,0,0.25))' }
 };
