@@ -83,7 +83,7 @@ export default function BabyApp() {
 
       {showUndo && (
         <div style={S.undoToast}>
-          <span>אירוע נוסף! ✨</span>
+          <span>עודכן! ✨</span>
           <button onClick={async () => { await deleteDoc(doc(db,"events",undoAction.id)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל</button>
         </div>
       )}
@@ -124,7 +124,7 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
   return (
     <div style={S.mainWidget}>
-      <div style={{fontSize: 14, fontWeight: 700, color: 'white', marginBottom: 2, opacity: 0.9}}>אכלה לפני:</div>
+      <div style={{fontSize: 14, fontWeight: 700, color: 'white', marginBottom: 2}}>אכלה לפני:</div>
       <div className="kids-font" style={{fontSize: 48, fontWeight: 900, color: 'white'}}>🍼 {timeStr}</div>
       <div style={S.nextFeedBox} onClick={onOpenFutureFeeds}>
           <span style={{fontSize: 14, fontWeight: 700, color: C.textSoft}}>ארוחה הבאה: </span>
@@ -149,7 +149,7 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (The "v1beta" Fix) ────────────────────────────────────────
+// ── AI Component (The gemini-pro Fix) ─────────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -167,25 +167,25 @@ function AiModal({ events, onClose }) {
   const askAi = async () => {
     if (!q.trim() || !localKey) return;
     setLoading(true);
-    setAns("מנתחת נתונים... 🌸");
+    setAns("מנתחת... 🌸");
     try {
-      const contextData = events.slice(0, 20).map(e => {
+      const contextData = events.slice(0, 15).map(e => {
         const time = new Date(e.ts).toLocaleString('he-IL', { hour: '2-digit', minute: '2-digit' });
-        return e.type === 'feed' ? `[${time}] האכלה ${e.ml}ml` : `[${time}] חיתול`;
+        return e.type === 'feed' ? `[${time}] אכלה ${e.ml}ml` : `[${time}] חיתול`;
       }).join('\n');
 
-      // כאן התיקון: שימוש ב-v1beta במקום v1
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${localKey.trim()}`, {
+      // שינוי למודל gemini-pro - הכי יציב
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${localKey.trim()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: `נתונים:\n${contextData}\n\nשאלה: ${q}\nענה בעברית קצרה מאוד ונעימה.` }] }]
+          contents: [{ parts: [{ text: `נתונים:\n${contextData}\n\nשאלה: ${q}\nענה בעברית קצרה מאוד.` }] }]
         })
       });
 
       const data = await res.json();
       if (data.error) setAns(`שגיאה: ${data.error.message}`);
-      else setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "משהו לא עבד.");
+      else setAns(data.candidates?.[0]?.content?.parts?.[0]?.text || "נסה שוב.");
     } catch (err) { setAns("שגיאת תקשורת."); }
     setLoading(false);
   };
@@ -195,16 +195,16 @@ function AiModal({ events, onClose }) {
         <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
         {isEditingKey ? (
           <div>
-            <p style={{fontSize:13, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק כאן את מפתח ה-API החדש:</p>
+            <p style={{fontSize:13, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק כאן מפתח API:</p>
             <input placeholder="AIza..." value={localKey} onChange={e=>setLocalKey(e.target.value)} style={S.input} />
-            <button onClick={saveKey} style={S.primaryBtn}>שמור מפתח</button>
+            <button onClick={saveKey} style={S.primaryBtn}>שמור</button>
           </div>
         ) : (
           <>
             <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"מנתחת...":"שאל אותי"}</button>
+            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"מנתחת...":"שאל"}</button>
             {ans && <div style={S.aiResponse}>{ans}</div>}
-            <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:11, marginTop:20, textDecoration:'underline', width:'100%'}}>עדכון מפתח API</button>
+            <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:11, marginTop:15, textDecoration:'underline', width:'100%'}}>עדכון מפתח API</button>
           </>
         )}
     </div></div>
@@ -244,7 +244,7 @@ function HomeView({ events, setModal, onDelete }) {
               <div key={e.id}>
                 <div style={{...S.eventMiniCard, background: C.blueSoft}}>
                   <div style={{display:'flex', justifyContent:'space-between', width:'100%'}}><span>{fmtTime(e.ts)}</span><button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button></div>
-                  <div style={{fontWeight:800, fontSize: 16}}>🧷 בוצע</div>
+                  <div style={{fontWeight:800, fontSize: 16}}>🧷</div>
                 </div>
                 {diapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, diapers[i+1].ts)}</div></div>}
               </div>
@@ -256,27 +256,7 @@ function HomeView({ events, setModal, onDelete }) {
   );
 }
 
-function FeedModal({ onConfirm, onClose }) {
-  const [ml, setMl] = useState("120");
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', marginBottom: 20}}>האכלה 🍼</h3>
-      <input type="number" value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
-      <button onClick={()=>{onConfirm({type:'feed', ml}); onClose();}} style={S.primaryBtn}>שמור</button>
-    </div></div>
-  );
-}
-
-function DiaperModal({ onConfirm, onClose }) {
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', marginBottom: 20}}>החתלה 🧷</h3>
-      <button onClick={()=>{onConfirm({type:'diaper'}); onClose();}} style={S.primaryBtn}>שמור</button>
-    </div></div>
-  );
-}
-
-// ── Styles ────────────────────────────────────────────────────────────────
+// ── Styles (Full Strength Version) ────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "45px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.3)" },
