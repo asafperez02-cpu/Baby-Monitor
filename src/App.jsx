@@ -56,7 +56,7 @@ export default function BabyApp() {
 
       {showUndo && (
         <div style={S.undoToast}>
-          <span>נרשם! ✨</span>
+          <span>נרשם בהצלחה! ✨</span>
           <button onClick={async () => { await deleteDoc(doc(db,"events",undoId)); setShowUndo(false); }} style={{color: C.peach, border:'none', background:'none', fontWeight:800}}>בטל</button>
         </div>
       )}
@@ -69,7 +69,7 @@ export default function BabyApp() {
 
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
-        {tab === "analytics" && <AnalyticsView events={events} />}
+        {tab === "analytics" && <div style={S.card}>גרפים ותובנות בקרוב... 📊</div>}
       </div>
 
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
@@ -82,7 +82,7 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "futureFeeds" && <FutureFeedsModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AnalyticalAiModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <HybridAiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -107,43 +107,52 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   );
 }
 
-// ── Analytical AI (The "Brain") ───────────────────────────────────────────
-function AnalyticalAiModal({ events, onClose }) {
-  const [ans, setAns] = useState("בחר ניתוח נתונים: ✨");
+// ── Hybrid "Smart" AI Engine ───────────────────────────────────────────
+function HybridAiModal({ events, onClose }) {
+  const [query, setQuery] = useState("");
+  const [ans, setAns] = useState("אני מקשיבה... מה תרצה לדעת על עלמה? ✨");
 
-  const runAnalysis = (mode) => {
+  const processQuery = () => {
+    const q = query.toLowerCase();
     const nowTs = Date.now();
     const oneDayMs = 24 * 60 * 60 * 1000;
-    
-    if (mode === '3days') {
-      const last3Days = events.filter(e => e.type === 'feed' && e.ts > nowTs - (3 * oneDayMs));
-      const totalMl = last3Days.reduce((sum, e) => sum + Number(e.ml || 0), 0);
-      const avg = Math.round(totalMl / 3);
-      setAns(`בשלושת הימים האחרונים עלמה אכלה בממוצע ${avg} מ"ל ליממה. (סה"כ ${totalMl} מ"ל)`);
+    const todayStr = new Date().toDateString();
+
+    // לוגיקת ניתוח
+    if (q.includes("ממוצע") || q.includes("3 ימים") || q.includes("שלושה ימים")) {
+      const last3 = events.filter(e => e.type === 'feed' && e.ts > nowTs - (3 * oneDayMs));
+      const total = last3.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+      setAns(`בחישוב של 3 הימים האחרונים, עלמה אכלה בממוצע ${Math.round(total / 3)} מ"ל ליום. סך הכל היא צרכה ${total} מ"ל בתקופה זו.`);
     } 
-    else if (mode === 'trend') {
-      const today = events.filter(e => e.type === 'feed' && new Date(e.ts).toDateString() === new Date().toDateString());
-      const yesterday = events.filter(e => e.type === 'feed' && new Date(e.ts).toDateString() === new Date(nowTs - oneDayMs).toDateString());
-      const todaySum = today.reduce((sum, e) => sum + Number(e.ml || 0), 0);
-      const yesterdaySum = yesterday.reduce((sum, e) => sum + Number(e.ml || 0), 0);
-      const diff = todaySum - yesterdaySum;
-      setAns(`אתמול אכלה ${yesterdaySum} מ"ל. היום עד כה ${todaySum} מ"ל. ${diff > 0 ? 'עלייה של ' + diff : 'ירידה של ' + Math.abs(diff)} מ"ל.`);
+    else if (q.includes("היום") || q.includes("כמה אכלה")) {
+      const today = events.filter(e => e.type === 'feed' && new Date(e.ts).toDateString() === todayStr);
+      const total = today.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+      setAns(`היום עלמה אכלה עד כה ${total} מ"ל ב-${today.length} ארוחות שונות.`);
     }
-    else if (mode === 'diapers') {
-      const lastWeekDiapers = events.filter(e => e.type === 'diaper' && e.ts > nowTs - (7 * oneDayMs));
-      const avg = (lastWeekDiapers.length / 7).toFixed(1);
-      setAns(`בשבוע האחרון הוחלפו בממוצע ${avg} חיתולים ביום.`);
+    else if (q.includes("חיתול") || q.includes("קקי") || q.includes("פיפי")) {
+      const todayDiapers = events.filter(e => e.type === 'diaper' && new Date(e.ts).toDateString() === todayStr);
+      setAns(`היום החלפנו לעלמה ${todayDiapers.length} חיתולים.`);
+    }
+    else if (q.includes("אחרונה") || q.includes("מתי אכלה")) {
+      const last = events.find(e => e.type === 'feed');
+      setAns(last ? `הארוחה האחרונה הייתה ב-${fmtTime(last.ts)}. היא אכלה ${last.ml} מ"ל.` : "לא מצאתי תיעוד של האכלה.");
+    }
+    else {
+      setAns("אני לא בטוחה שהבנתי... נסה לשאול על הממוצע ב-3 ימים האחרונים, כמה היא אכלה היום או מתי הייתה הארוחה האחרונה.");
     }
   };
 
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>ניתוח הנתונים של עלמה 📊</h3>
-        <div style={{display:'flex', flexDirection:'column', gap:10, marginTop: 20}}>
-          <button onClick={() => runAnalysis('3days')} style={S.primaryBtn}>📈 ממוצע האכלות (3 ימים)</button>
-          <button onClick={() => runAnalysis('trend')} style={S.primaryBtn}>⚖️ השוואה לאתמול</button>
-          <button onClick={() => runAnalysis('diapers')} style={S.primaryBtn}>🧷 סטטיסטיקת חיתולים</button>
-        </div>
+        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, marginBottom: 15}}>העוזרת של עלמה 🌸</h3>
+        <input 
+          placeholder="שאל אותי בשפה חופשית..." 
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && processQuery()}
+          style={S.input}
+        />
+        <button onClick={processQuery} style={S.primaryBtn}>נתחי נתונים</button>
         {ans && <div style={S.aiResponse}>{ans}</div>}
         <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 15}}>סגור</button>
     </div></div>
@@ -169,10 +178,6 @@ function HomeView({ events, setModal, onDelete }) {
       </div>
     </div>
   );
-}
-
-function AnalyticsView({ events }) {
-  return <div style={S.card}><div className="kids-font" style={S.cardTitle}>גרפים וניתוח מעמיק 📊</div><p style={{textAlign:'center', color:C.textSoft}}>השתמש בכפתור הבקבוק המרחף לניתוח מהיר של הממוצעים.</p></div>;
 }
 
 function FutureFeedsModal({ events, onClose }) {
@@ -230,7 +235,7 @@ const S = {
   aiFab: { position: "fixed", bottom: 100, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 99 },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "90%", maxWidth: "380px" },
-  input: { width: "100%", padding: "16px", borderRadius: "20px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 18, fontWeight: 700 },
+  input: { width: "100%", padding: "16px", borderRadius: "20px", border: `2px solid #f1f5f9`, marginBottom: 15, textAlign: "center", fontSize: 18, fontWeight: 700 },
   primaryBtn: { width: "100%", padding: "18px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18, marginBottom: 5 },
   aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 16, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700, textAlign: 'center' },
   itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px dotted #eee' },
