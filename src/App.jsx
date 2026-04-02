@@ -139,7 +139,6 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      {/* כפתור ה-AI הענק והמרחף השקוף */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
@@ -233,7 +232,7 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (Pastel Edition) ───────────────────────────────────────────
+// ── AI Component (Secure & Robust) ──────────────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -242,13 +241,16 @@ function AiModal({ events, onClose }) {
   const askAi = async () => {
     if (!q.trim()) return;
     setLoading(true);
-    setAns("חושבת... 🌸");
+    setAns("מנתחת נתונים... 🌸");
 
     try {
+      // כאן התיקון הקריטי למשיכת המפתח
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       
-      if (!apiKey) {
-        setAns("שגיאה: חסר מפתח API. ודא שהגדרת VITE_GEMINI_API_KEY ב-Vercel והאתר נבנה מחדש.");
+      console.log("Checking API Key availability...");
+
+      if (!apiKey || apiKey === "your_actual_key_here") {
+        setAns("שגיאת תצורה: המפתח לא נקלט. חובה לעשות ב-Vercel פריסה מחדש (Redeploy) ללא V בתיבת ה-Cache.");
         setLoading(false);
         return;
       }
@@ -276,13 +278,16 @@ ${contextData}
       });
 
       const data = await res.json();
-      if (data.candidates && data.candidates[0].content.parts[0].text) {
+      
+      if (data.error) {
+        setAns(`שגיאת גוגל: ${data.error.message}`);
+      } else if (data.candidates && data.candidates[0].content.parts[0].text) {
         setAns(data.candidates[0].content.parts[0].text);
       } else {
         setAns("אופס, לא הצלחתי להבין את הנתונים.");
       }
     } catch (err) {
-      setAns("שגיאה בתקשורת עם שרת ה-AI.");
+      setAns("שגיאת תקשורת. בדוק חיבור לאינטרנט.");
     }
     setLoading(false);
   };
