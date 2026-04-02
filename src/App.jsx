@@ -232,13 +232,12 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (The Local Storage Bypass Fix) ───────────────────────────
+// ── AI Component (The Final Address Fix) ──────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
   
-  // במקום למשוך מ-Vercel, אנחנו שומרים את המפתח בטלפון של המשתמש!
   const [localKey, setLocalKey] = useState(() => localStorage.getItem("gemini_key") || "");
   const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("gemini_key"));
 
@@ -246,9 +245,9 @@ function AiModal({ events, onClose }) {
     if(localKey.trim().length > 20) {
       localStorage.setItem("gemini_key", localKey.trim());
       setIsEditingKey(false);
-      setAns("המפתח נשמר בהצלחה! עכשיו אפשר לשאול שאלות.");
+      setAns("המפתח נשמר! עכשיו בוא נשאל.");
     } else {
-      setAns("המפתח לא נראה תקין, אנא בדוק שוב.");
+      setAns("המפתח קצר מדי.");
     }
   };
 
@@ -260,7 +259,7 @@ function AiModal({ events, onClose }) {
     try {
       const apiKey = localKey;
       if (!apiKey) {
-        setAns("חסר מפתח API.");
+        setAns("חסר מפתח.");
         setLoading(false);
         return;
       }
@@ -272,14 +271,15 @@ function AiModal({ events, onClose }) {
         return '';
       }).join('\n');
 
-      const prompt = `אתה עוזר וירטואלי חכם ועוזר אישי להורים של התינוקת עלמה. 
-הנה הנתונים האחרונים שלה:
+      const prompt = `אתה עוזר וירטואלי להורים של התינוקת עלמה. 
+הנה הנתונים האחרונים:
 ${contextData}
 
 שאלה מההורה: ${q}
-ענה בעברית, בצורה קצרה (עד 2 משפטים), מדויקת ונעימה. אל תמציא נתונים. אם אי אפשר לענות מהנתונים, תגיד שאין מספיק מידע.`;
+ענה בעברית קצרה מאוד ונעימה.`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // הכתובת המעודכנת (v1 במקום v1beta)
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -290,20 +290,14 @@ ${contextData}
       const data = await res.json();
       
       if (data.error) {
-        if(data.error.code === 400 && data.error.message.includes("API key not valid")) {
-           setAns("המפתח לא תקין או שפג תוקפו. אנא הזן מפתח חדש.");
-           localStorage.removeItem("gemini_key");
-           setIsEditingKey(true);
-        } else {
-           setAns(`שגיאת גוגל: ${data.error.message}`);
-        }
+        setAns(`שגיאת גוגל: ${data.error.message}`);
       } else if (data.candidates && data.candidates[0].content.parts[0].text) {
         setAns(data.candidates[0].content.parts[0].text);
       } else {
-        setAns("אופס, לא הצלחתי להבין את הנתונים.");
+        setAns("אופס, משהו לא עבד.");
       }
     } catch (err) {
-      setAns("שגיאת תקשורת. בדוק חיבור לאינטרנט.");
+      setAns("שגיאת תקשורת.");
     }
     setLoading(false);
   };
@@ -316,10 +310,10 @@ ${contextData}
         {isEditingKey ? (
           <div style={{marginBottom: 20}}>
             <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 15}}>
-              הדבק כאן את מפתח ה-API פעם אחת והוא יישמר בטלפון שלך.
+              הדבק כאן את מפתח ה-API (ה-AIzaSy...):
             </p>
             <input 
-              placeholder="AIzaSy..." 
+              placeholder="הדבק כאן" 
               value={localKey} 
               onChange={e=>setLocalKey(e.target.value)} 
               style={{...S.input, marginBottom:10, direction:'ltr'}} 
@@ -329,10 +323,10 @@ ${contextData}
           </div>
         ) : (
           <>
-            <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל, ה-AI מנתח את הפעולות האחרונות</p>
+            <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל על עלמה</p>
             
             <input 
-              placeholder="למשל: כמה עלמה אכלה היום?" 
+              placeholder="למשל: כמה היא אכלה היום?" 
               value={q} 
               onChange={e=>setQ(e.target.value)} 
               style={{...S.input, marginBottom:15}} 
@@ -349,7 +343,7 @@ ${contextData}
               </div>
             )}
             <div style={{textAlign:'center', marginTop:15}}>
-               <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:12, textDecoration:'underline'}}>החלף מפתח API</button>
+               <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:12, textDecoration:'underline'}}>עדכון מפתח API</button>
             </div>
           </>
         )}
@@ -568,7 +562,7 @@ function DiaperModal({ onConfirm, onClose }) {
   );
 }
 
-// ── Styles (Pro Edit) ──────────────────────────────────────────────────────
+// ── Styles ────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "calc(15px + env(safe-area-inset-top)) 20px 25px", borderRadius: "0 0 45px 45px", textAlign: "center", zIndex: 10, boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
