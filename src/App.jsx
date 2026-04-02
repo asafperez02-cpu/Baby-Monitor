@@ -139,6 +139,8 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
+      <button onClick={() => setModal("ai")} style={S.aiFab}>✨</button>
+
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ראשי</button>
         <div style={{width: 1, background: '#f1f5f9', margin: '10px 0'}}></div>
@@ -148,6 +150,7 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "futureFeeds" && <FutureFeedsModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
@@ -167,7 +170,6 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const diffMin = Math.floor((now - lastFeed.ts) / 60000);
   const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
   
-  // Progress Logic (Target is 4 hours = 240 mins)
   const targetMins = 240;
   const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
   
@@ -175,7 +177,7 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   if (diffMin > 150) progColor = C.warning;
   if (diffMin > 210) progColor = C.danger;
 
-  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000); // 4 hours
+  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
   
   return (
     <div style={S.mainWidget}>
@@ -186,18 +188,15 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
         <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
       </div>
 
-      {/* קוביית ארוחה הבאה החדשה - מעוצבת וברורה */}
       <div style={S.nextFeedBox} onClick={onOpenFutureFeeds}>
-        <div style={{display:'flex', alignItems: 'center', gap: 12}}>
-          <div style={{background: C.creamSoft, borderRadius: '16px', width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.05)'}}>
-            ⏰
+        <div style={{display:'flex', alignItems: 'center', justifyContent: 'space-between'}}>
+          <div style={{display:'flex', alignItems:'center', gap: 8}}>
+            <span style={{fontSize: 22}}>⏰</span>
+            <span style={{fontSize: 14, fontWeight: 700, color: C.textSoft}}>ארוחה הבאה:</span>
+            <span style={{fontSize: 18, fontWeight: 900, color: C.text}}>{fmtTime(nextTarget.getTime())}</span>
           </div>
-          <div style={{flex: 1, textAlign: 'right'}}>
-            <div style={{fontSize: 13, color: C.textSoft, fontWeight: 700}}>ארוחה הבאה (משוערת)</div>
-            <div style={{fontSize: 22, fontWeight: 900, color: C.text}}>{fmtTime(nextTarget.getTime())}</div>
-          </div>
-          <div style={{background: C.peach, color: 'white', borderRadius: '14px', padding: '8px 14px', fontSize: 13, fontWeight: 800, boxShadow: '0 4px 10px rgba(244, 165, 138, 0.4)'}}>
-            לו״ז מלא
+          <div style={{background: C.peach, color: 'white', borderRadius: '12px', padding: '6px 14px', fontSize: 13, fontWeight: 800, boxShadow: '0 4px 10px rgba(244, 165, 138, 0.4)'}}>
+            תחזית
           </div>
         </div>
       </div>
@@ -209,7 +208,6 @@ function FutureFeedsModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
 
-  // 16 hours forecast (4 intervals of 4 hours)
   const futureFeeds = Array.from({length: 4}).map((_, i) => {
     return new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000);
   });
@@ -234,6 +232,33 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
+function AiModal({ onClose }) {
+  const [q, setQ] = useState("");
+  const [ans, setAns] = useState("");
+
+  const askAi = () => {
+    setAns("מנתח נתונים... 🧠 בשביל שהקסם יעבוד, נצטרך להוסיף מפתח API אמיתי בשלב הבא!");
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={S.modal} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:'#a855f7'}}>העוזרת של עלמה ✨</h3>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל על ההרגלים של עלמה</p>
+        
+        <input placeholder="למשל: כמה היא אכלה היום בממוצע?" value={q} onChange={e=>setQ(e.target.value)} style={{...S.input, marginBottom:15}} />
+        <button onClick={askAi} style={{...S.primaryBtn, background: '#a855f7', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'}}>שאל את ה-AI</button>
+        
+        {ans && (
+          <div style={{marginTop: 20, padding: 15, background: '#f3e8ff', borderRadius: 12, fontSize: 14, fontWeight: 700, color: '#6b21a8', lineHeight: '1.5', border: '1px solid #e9d5ff'}}>
+            {ans}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function HomeView({ events, setModal, onDelete }) {
   const isToday = (ts) => new Date(ts).toDateString() === new Date().toDateString();
   const feeds = events.filter(e => e.type === "feed" && isToday(e.ts)).sort((a, b) => b.ts - a.ts);
@@ -245,8 +270,6 @@ function HomeView({ events, setModal, onDelete }) {
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
-      
-      {/* כפתורי פעולה משודרגים - גדולים, ברורים ומופרדים לשורות */}
       <div style={{display:'flex', gap:15}}>
         <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', border: '1px solid #f7e0b5', color:'#854d0e', boxShadow: '0 4px 12px rgba(247,224,181,0.5)'}}>
           <span style={{fontSize: 34}}>🍼</span>
@@ -333,7 +356,6 @@ function AnalyticsView({ events }) {
     }
   });
 
-  // סידור הימים לתצוגה - מהישן לחדש (כרונולוגי נכון)
   const sortedDays = Object.values(daysMap).sort((a,b) => b.ts - a.ts).slice(0, 7);
   const chartDays = [...sortedDays].reverse(); 
   
@@ -342,7 +364,6 @@ function AnalyticsView({ events }) {
   const svgWidth = 320;
   
   const points = chartDays.map((d, i) => {
-    // מניח את הנקודה הראשונה (הישנה ביותר) משמאל, ומתקדם ימינה
     const x = chartDays.length === 1 ? svgWidth / 2 : 15 + (i / (chartDays.length - 1)) * (svgWidth - 30);
     const y = svgHeight - 30 - ((d.ml / maxMl) * (svgHeight - 60));
     return { ...d, x, y };
@@ -377,7 +398,6 @@ function AnalyticsView({ events }) {
           </svg>
         </div>
         
-        {/* הגדרה קריטית לגרפים: direction ltr מבטיח שהתאריך הישן ביותר יוצג בשמאל והחדש בימין */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 15, direction: 'ltr' }}>
           {points.map(p => (
             <div key={p.ts} style={{ textAlign: 'center', flex: 1, direction: 'rtl' }}>
@@ -459,7 +479,7 @@ const S = {
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "25px", padding: "20px", border: "1px solid rgba(255, 255, 255, 0.4)", display: "inline-block", width: "100%", maxWidth: "340px", boxShadow: '0 10px 20px rgba(0,0,0,0.05)' },
   progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s cubic-bezier(0.4, 0, 0.2, 1)', borderRadius: '10px' },
-  nextFeedBox: { marginTop: 20, background: "white", padding: "16px", borderRadius: "22px", boxShadow: "0 8px 20px rgba(0,0,0,0.08)", cursor: "pointer", border: `1px solid #f1f5f9` },
+  nextFeedBox: { marginTop: 15, background: "rgba(255,255,255,0.7)", padding: "12px 16px", borderRadius: "18px", cursor: "pointer", border: `1px solid rgba(255,255,255,0.9)` },
   content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" }, 
   actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "24px", fontSize: 20, fontWeight: 800, fontFamily: FONT_KIDS, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '5px' },
   card: { background: "white", borderRadius: "25px", padding: "20px", border: `1px solid #f1f5f9`, marginBottom: 20, boxShadow: '0 4px 15px rgba(0,0,0,0.02)' },
@@ -484,5 +504,6 @@ const S = {
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 99999 },
   modal: { background: "white", padding: "30px 25px", borderRadius: "35px", width: "90%", maxWidth: 360, boxShadow: '0 20px 40px rgba(0,0,0,0.2)' },
   chip: (active) => ({ flex: 1, padding: "12px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
-  summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #f8fafc' }
+  summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 0', borderBottom:'1px solid #f8fafc' },
+  aiFab: { position: 'fixed', bottom: 90, left: 20, background: '#a855f7', color: 'white', border: 'none', borderRadius: '50%', width: 56, height: 56, fontSize: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 15px rgba(168, 85, 247, 0.4)', zIndex: 9998, cursor: 'pointer' }
 };
