@@ -232,25 +232,82 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-function AiModal({ onClose }) {
+// ── AI Component ────────────────────────────────────────────────────────────
+function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const askAi = () => {
-    setAns("מנתח נתונים... 🧠 בשביל שהקסם יעבוד, נצטרך להוסיף מפתח API אמיתי בשלב הבא!");
+  const askAi = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setAns("חושב... 🧠");
+
+    try {
+      // משיכת המפתח מתוך קובץ ההגדרות
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      
+      if (!apiKey) {
+        setAns("שגיאה: חסר מפתח API. ודא שהגדרת VITE_GEMINI_API_KEY ב-Vercel והאתר נבנה מחדש.");
+        setLoading(false);
+        return;
+      }
+
+      // הכנת "גיליון הנתונים" עבור ה-AI - ניקח את 20 האירועים האחרונים
+      const contextData = events.slice(0, 20).map(e => {
+        const time = new Date(e.ts).toLocaleString('he-IL', { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+        if (e.type === 'feed') return `[${time}] האכלה: ${e.ml} מ"ל`;
+        if (e.type === 'diaper') return `[${time}] חיתול: ${e.pee ? 'פיפי' : ''} ${e.poop ? 'קקי' : ''}`;
+        return '';
+      }).join('\n');
+
+      const prompt = `אתה עוזר וירטואלי חכם ועוזר אישי להורים של התינוקת עלמה. 
+הנה הנתונים האחרונים שלה:
+${contextData}
+
+שאלה מההורה: ${q}
+ענה בעברית, בצורה קצרה (עד 2 משפטים), מדויקת ונעימה. אל תמציא נתונים. אם אי אפשר לענות מהנתונים, תגיד שאין מספיק מידע.`;
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }]
+        })
+      });
+
+      const data = await res.json();
+      if (data.candidates && data.candidates[0].content.parts[0].text) {
+        setAns(data.candidates[0].content.parts[0].text);
+      } else {
+        setAns("אופס, לא הצלחתי להבין את הנתונים.");
+      }
+    } catch (err) {
+      setAns("שגיאה בתקשורת עם שרת ה-AI.");
+    }
+    setLoading(false);
   };
 
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e=>e.stopPropagation()}>
         <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:'#a855f7'}}>העוזרת של עלמה ✨</h3>
-        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל על ההרגלים של עלמה</p>
+        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>ה-AI מנתח את הפעולות האחרונות</p>
         
-        <input placeholder="למשל: כמה היא אכלה היום בממוצע?" value={q} onChange={e=>setQ(e.target.value)} style={{...S.input, marginBottom:15}} />
-        <button onClick={askAi} style={{...S.primaryBtn, background: '#a855f7', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'}}>שאל את ה-AI</button>
+        <input 
+          placeholder="למשל: כמה עלמה אכלה היום?" 
+          value={q} 
+          onChange={e=>setQ(e.target.value)} 
+          style={{...S.input, marginBottom:15}} 
+          onKeyDown={(e) => e.key === 'Enter' && askAi()}
+        />
+        
+        <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, background: loading ? '#d8b4fe' : '#a855f7', boxShadow: '0 4px 12px rgba(168, 85, 247, 0.3)'}}>
+          {loading ? "מנתח..." : "שאל"}
+        </button>
         
         {ans && (
-          <div style={{marginTop: 20, padding: 15, background: '#f3e8ff', borderRadius: 12, fontSize: 14, fontWeight: 700, color: '#6b21a8', lineHeight: '1.5', border: '1px solid #e9d5ff'}}>
+          <div style={{marginTop: 20, padding: 15, background: '#f3e8ff', borderRadius: 12, fontSize: 15, fontWeight: 700, color: '#6b21a8', lineHeight: '1.5', border: '1px solid #e9d5ff'}}>
             {ans}
           </div>
         )}
@@ -426,6 +483,7 @@ function AnalyticsView({ events }) {
   );
 }
 
+// ... FeedModal & DiaperModal unchanged
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
   const [timeMode, setTimeMode] = useState("now");
