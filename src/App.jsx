@@ -232,11 +232,25 @@ function FutureFeedsModal({ events, onClose }) {
   );
 }
 
-// ── AI Component (Secure & Robust) ──────────────────────────────────────────
+// ── AI Component (The Local Storage Bypass Fix) ───────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
+  
+  // במקום למשוך מ-Vercel, אנחנו שומרים את המפתח בטלפון של המשתמש!
+  const [localKey, setLocalKey] = useState(() => localStorage.getItem("gemini_key") || "");
+  const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("gemini_key"));
+
+  const saveKey = () => {
+    if(localKey.trim().length > 20) {
+      localStorage.setItem("gemini_key", localKey.trim());
+      setIsEditingKey(false);
+      setAns("המפתח נשמר בהצלחה! עכשיו אפשר לשאול שאלות.");
+    } else {
+      setAns("המפתח לא נראה תקין, אנא בדוק שוב.");
+    }
+  };
 
   const askAi = async () => {
     if (!q.trim()) return;
@@ -244,13 +258,9 @@ function AiModal({ events, onClose }) {
     setAns("מנתחת נתונים... 🌸");
 
     try {
-      // כאן התיקון הקריטי למשיכת המפתח
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      
-      console.log("Checking API Key availability...");
-
-      if (!apiKey || apiKey === "your_actual_key_here") {
-        setAns("שגיאת תצורה: המפתח לא נקלט. חובה לעשות ב-Vercel פריסה מחדש (Redeploy) ללא V בתיבת ה-Cache.");
+      const apiKey = localKey;
+      if (!apiKey) {
+        setAns("חסר מפתח API.");
         setLoading(false);
         return;
       }
@@ -280,7 +290,13 @@ ${contextData}
       const data = await res.json();
       
       if (data.error) {
-        setAns(`שגיאת גוגל: ${data.error.message}`);
+        if(data.error.code === 400 && data.error.message.includes("API key not valid")) {
+           setAns("המפתח לא תקין או שפג תוקפו. אנא הזן מפתח חדש.");
+           localStorage.removeItem("gemini_key");
+           setIsEditingKey(true);
+        } else {
+           setAns(`שגיאת גוגל: ${data.error.message}`);
+        }
       } else if (data.candidates && data.candidates[0].content.parts[0].text) {
         setAns(data.candidates[0].content.parts[0].text);
       } else {
@@ -296,24 +312,46 @@ ${contextData}
     <div style={S.overlay} onClick={onClose}>
       <div style={S.modal} onClick={e=>e.stopPropagation()}>
         <h3 className="kids-font" style={{textAlign:'center', marginBottom:5, color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-        <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל, ה-AI מנתח את הפעולות האחרונות</p>
         
-        <input 
-          placeholder="למשל: כמה עלמה אכלה היום?" 
-          value={q} 
-          onChange={e=>setQ(e.target.value)} 
-          style={{...S.input, marginBottom:15}} 
-          onKeyDown={(e) => e.key === 'Enter' && askAi()}
-        />
-        
-        <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, background: loading ? '#fcd34d' : C.peach, boxShadow: '0 4px 12px rgba(244, 165, 138, 0.3)'}}>
-          {loading ? "מנתחת..." : "שאל אותי"}
-        </button>
-        
-        {ans && (
-          <div style={{marginTop: 20, padding: 15, background: C.creamSoft, borderRadius: 12, fontSize: 15, fontWeight: 700, color: C.text, lineHeight: '1.5', border: `1px solid ${C.border}`}}>
-            {ans}
+        {isEditingKey ? (
+          <div style={{marginBottom: 20}}>
+            <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 15}}>
+              הדבק כאן את מפתח ה-API פעם אחת והוא יישמר בטלפון שלך.
+            </p>
+            <input 
+              placeholder="AIzaSy..." 
+              value={localKey} 
+              onChange={e=>setLocalKey(e.target.value)} 
+              style={{...S.input, marginBottom:10, direction:'ltr'}} 
+            />
+            <button onClick={saveKey} style={{...S.primaryBtn, background: C.success}}>שמור מפתח</button>
+            {ans && <div style={{marginTop: 10, textAlign:'center', color: C.danger, fontSize:13}}>{ans}</div>}
           </div>
+        ) : (
+          <>
+            <p style={{textAlign:'center', fontSize: 13, color: C.textSoft, marginBottom: 20}}>שאל הכל, ה-AI מנתח את הפעולות האחרונות</p>
+            
+            <input 
+              placeholder="למשל: כמה עלמה אכלה היום?" 
+              value={q} 
+              onChange={e=>setQ(e.target.value)} 
+              style={{...S.input, marginBottom:15}} 
+              onKeyDown={(e) => e.key === 'Enter' && askAi()}
+            />
+            
+            <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, background: loading ? '#fcd34d' : C.peach, boxShadow: '0 4px 12px rgba(244, 165, 138, 0.3)'}}>
+              {loading ? "מנתחת..." : "שאל אותי"}
+            </button>
+            
+            {ans && (
+              <div style={{marginTop: 20, padding: 15, background: C.creamSoft, borderRadius: 12, fontSize: 15, fontWeight: 700, color: C.text, lineHeight: '1.5', border: `1px solid ${C.border}`}}>
+                {ans}
+              </div>
+            )}
+            <div style={{textAlign:'center', marginTop:15}}>
+               <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:12, textDecoration:'underline'}}>החלף מפתח API</button>
+            </div>
+          </>
         )}
       </div>
     </div>
