@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import {
-  collection, addDoc, deleteDoc, doc, updateDoc,
-  onSnapshot, query, orderBy, setDoc
+  collection, addDoc, deleteDoc, doc, 
+  onSnapshot, query, orderBy
 } from "firebase/firestore";
 import { db } from "./firebase";
 
-// ── Palette & Theme (Strong Pastel) ──────────────────────────────────────
+// ── Palette & Theme (Original Pastel) ──────────────────────────────────────
 const C = {
   bg: "#fffcfb", white: "#ffffff", border: "#f7d7c4", peach: "#f4a58a",
   peachDark: "#e8845e", blueSoft: "#e0f2fe", creamSoft: "#fff7ed",
@@ -16,7 +16,6 @@ const FONT_MAIN = "'Assistant', sans-serif";
 const FONT_KIDS = "'Varela Round', sans-serif"; 
 
 function fmtTime(ts) { return new Date(ts).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" }); }
-function getHebrewDay(ts) { const days = ['א׳', 'ב׳', 'ג׳', 'ד׳', 'ה׳', 'ו׳', 'שבת']; return `יום ${days[new Date(ts).getDay()]}`; }
 function getTimeGap(ts1, ts2) {
   const m = Math.floor(Math.abs(ts1 - ts2) / 60000);
   if (m < 60) return `${m} דק׳`;
@@ -70,7 +69,7 @@ export default function BabyApp() {
 
       <div style={S.content}>
         {tab === "home" && <HomeView events={events} setModal={setModal} onDelete={id => deleteDoc(doc(db,"events",id))} />}
-        {tab === "analytics" && <div style={S.card}>גרפים בקרוב... 📊</div>}
+        {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
@@ -83,10 +82,12 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "futureFeeds" && <FutureFeedsModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AnalyticalAiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
+
+// ── Components ──────────────────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -106,52 +107,45 @@ function MainTimerWidget({ events, now, onOpenFutureFeeds }) {
   );
 }
 
-// ── AI Component (Ultra Stable Version) ──────────────────────────────────
-function AiModal({ events, onClose }) {
-  const [q, setQ] = useState("");
-  const [ans, setAns] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [localKey, setLocalKey] = useState(() => localStorage.getItem("hf_key") || "");
-  const [isEditingKey, setIsEditingKey] = useState(!localStorage.getItem("hf_key"));
+// ── Analytical AI (The "Brain") ───────────────────────────────────────────
+function AnalyticalAiModal({ events, onClose }) {
+  const [ans, setAns] = useState("בחר ניתוח נתונים: ✨");
 
-  const askAi = async () => {
-    if (!q.trim() || !localKey) return;
-    setLoading(true);
-    setAns("מחשבת... ✨");
-    try {
-      const history = events.slice(0, 5).map(e => `${e.type === 'feed' ? 'אכלה' : 'חיתול'}`).join(', ');
-      
-      const res = await fetch("https://api-inference.huggingface.co/models/gpt2", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${localKey.trim()}` },
-        body: JSON.stringify({ inputs: `התינוקת עלמה. היסטוריה: ${history}. שאלה: ${q}. תשובה קצרה:` })
-      });
-
-      const data = await res.json();
-      // GPT-2 פשוט מחזיר טקסט מושלם, אנחנו רק מנקים אותו
-      const rawText = data[0]?.generated_text || "סליחה, נסי שוב.";
-      setAns(rawText.split("תשובה קצרה:")[1] || rawText);
-    } catch (err) { setAns("שגיאת תקשורת. בדוק את המפתח."); }
-    setLoading(false);
+  const runAnalysis = (mode) => {
+    const nowTs = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    
+    if (mode === '3days') {
+      const last3Days = events.filter(e => e.type === 'feed' && e.ts > nowTs - (3 * oneDayMs));
+      const totalMl = last3Days.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+      const avg = Math.round(totalMl / 3);
+      setAns(`בשלושת הימים האחרונים עלמה אכלה בממוצע ${avg} מ"ל ליממה. (סה"כ ${totalMl} מ"ל)`);
+    } 
+    else if (mode === 'trend') {
+      const today = events.filter(e => e.type === 'feed' && new Date(e.ts).toDateString() === new Date().toDateString());
+      const yesterday = events.filter(e => e.type === 'feed' && new Date(e.ts).toDateString() === new Date(nowTs - oneDayMs).toDateString());
+      const todaySum = today.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+      const yesterdaySum = yesterday.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+      const diff = todaySum - yesterdaySum;
+      setAns(`אתמול אכלה ${yesterdaySum} מ"ל. היום עד כה ${todaySum} מ"ל. ${diff > 0 ? 'עלייה של ' + diff : 'ירידה של ' + Math.abs(diff)} מ"ל.`);
+    }
+    else if (mode === 'diapers') {
+      const lastWeekDiapers = events.filter(e => e.type === 'diaper' && e.ts > nowTs - (7 * oneDayMs));
+      const avg = (lastWeekDiapers.length / 7).toFixed(1);
+      setAns(`בשבוע האחרון הוחלפו בממוצע ${avg} חיתולים ביום.`);
+    }
   };
 
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-        {isEditingKey ? (
-          <div>
-            <p style={{fontSize:12, textAlign:'center', color:C.textSoft, marginBottom: 10}}>הדבק מפתח (hf_...) מ-Hugging Face:</p>
-            <input placeholder="hf_..." value={localKey} onChange={e=>setLocalKey(e.target.value)} style={S.input} />
-            <button onClick={() => { localStorage.setItem("hf_key", localKey.trim()); setIsEditingKey(false); }} style={S.primaryBtn}>שמור מפתח</button>
-          </div>
-        ) : (
-          <>
-            <input placeholder="למשל: כמה היא אכלה?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-            <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading?"...":"שאל אותי"}</button>
-            {ans && <div style={S.aiResponse}>{ans}</div>}
-            <button onClick={()=>setIsEditingKey(true)} style={{background:'none', border:'none', color:C.textSoft, fontSize:10, marginTop:15, textDecoration:'underline', width:'100%'}}>החלף מפתח</button>
-          </>
-        )}
+        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>ניתוח הנתונים של עלמה 📊</h3>
+        <div style={{display:'flex', flexDirection:'column', gap:10, marginTop: 20}}>
+          <button onClick={() => runAnalysis('3days')} style={S.primaryBtn}>📈 ממוצע האכלות (3 ימים)</button>
+          <button onClick={() => runAnalysis('trend')} style={S.primaryBtn}>⚖️ השוואה לאתמול</button>
+          <button onClick={() => runAnalysis('diapers')} style={S.primaryBtn}>🧷 סטטיסטיקת חיתולים</button>
+        </div>
+        {ans && <div style={S.aiResponse}>{ans}</div>}
+        <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 15}}>סגור</button>
     </div></div>
   );
 }
@@ -175,6 +169,10 @@ function HomeView({ events, setModal, onDelete }) {
       </div>
     </div>
   );
+}
+
+function AnalyticsView({ events }) {
+  return <div style={S.card}><div className="kids-font" style={S.cardTitle}>גרפים וניתוח מעמיק 📊</div><p style={{textAlign:'center', color:C.textSoft}}>השתמש בכפתור הבקבוק המרחף לניתוח מהיר של הממוצעים.</p></div>;
 }
 
 function FutureFeedsModal({ events, onClose }) {
@@ -228,13 +226,13 @@ const S = {
   chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft },
   delBtn: { border: 'none', background: 'none', color: '#cbd5e1' },
   nav: { display: "flex", background: "white", borderTop: `1px solid #f1f5f9`, padding: "18px 25px 30px" },
-  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "14px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft }),
+  navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "14px", borderRadius: "18px", fontWeight: 800, color: active ? "white" : C.textSoft }),
   aiFab: { position: "fixed", bottom: 100, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 99 },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "90%", maxWidth: "380px" },
   input: { width: "100%", padding: "16px", borderRadius: "20px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 18, fontWeight: 700 },
-  primaryBtn: { width: "100%", padding: "18px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18 },
-  aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 15, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700 },
+  primaryBtn: { width: "100%", padding: "18px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 18, marginBottom: 5 },
+  aiResponse: { marginTop: 20, padding: "18px", background: C.creamSoft, borderRadius: "22px", fontSize: 16, color: C.text, lineHeight: "1.6", border: `1px solid ${C.border}`, fontWeight: 700, textAlign: 'center' },
   itemRow: { display: 'flex', justifyContent: 'space-between', padding: '15px 0', borderBottom: '1px dotted #eee' },
   undoToast: { position: 'fixed', bottom: 110, right: 20, left: 20, background: '#333', color: 'white', padding: '15px 25px', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 9999 }
 };
