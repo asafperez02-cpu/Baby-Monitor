@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     const apiKey = process.env.GEMINI_KEY;
     
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     const { question, history } = req.body;
 
     const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -36,4 +36,4 @@ export default async function handler(req, res) {
     console.error("Server Error:", error);
     res.status(500).json({ answer: "שגיאת שרת פנימית." });
   }
-}
+};
