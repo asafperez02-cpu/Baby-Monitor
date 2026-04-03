@@ -131,7 +131,7 @@ export default function BabyApp() {
   );
 }
 
-// ── AI Component (DIAGNOSTIC MODE WITH CREATE REACT APP VARS) ───────────────
+// ── AI Component (DIAGNOSTIC MODE + TRIM) ──────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -139,12 +139,11 @@ function AiModal({ events, onClose }) {
   const [debugLog, setDebugLog] = useState("מתחיל בדיקת מערכת...");
 
   useEffect(() => {
-    // מושך את המשתנה בשיטה של Create React App
     const key = process.env.REACT_APP_GEMINI_KEY;
     if (!key) {
       setDebugLog("❌ שגיאה: לא נמצא מפתח REACT_APP_GEMINI_KEY ב-Vercel. נא לוודא שם משתנה ו-Redeploy.");
     } else {
-      setDebugLog(`✅ מפתח זוהה (מתחיל ב-${key.substring(0, 5)}...) מוכן לפעולה.`);
+      setDebugLog(`✅ מפתח זוהה (מתחיל ב-${key.trim().substring(0, 5)}...) מוכן לפעולה.`);
     }
   }, []);
 
@@ -155,8 +154,10 @@ function AiModal({ events, onClose }) {
     setDebugLog("⏳ מכין נתונים לשליחה...");
 
     try {
-      const apiKey = process.env.REACT_APP_GEMINI_KEY;
-      if (!apiKey) throw new Error("Missing API Key");
+      // כאן התיקון הקריטי: trim() מנקה רווחים וירידות שורה נסתרות מהמפתח
+      const rawKey = process.env.REACT_APP_GEMINI_KEY;
+      if (!rawKey) throw new Error("Missing API Key");
+      const apiKey = rawKey.trim();
 
       const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
       setDebugLog("🚀 שולח בקשה לגוגל...");
@@ -196,7 +197,6 @@ function AiModal({ events, onClose }) {
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
       
-      {/* מסך חיווי טכנאי */}
       <div style={{background: '#1e293b', color: '#4ade80', padding: '10px', borderRadius: '10px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace'}}>
         > {debugLog}
       </div>
