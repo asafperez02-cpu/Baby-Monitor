@@ -115,7 +115,6 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      {/* כפתור העוזרת החכמה */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
@@ -131,96 +130,7 @@ export default function BabyApp() {
   );
 }
 
-// ── AI Component (BULLETPROOF DIAGNOSTIC MODE) ─────────────────────────────
-function AiModal({ events, onClose }) {
-  const [q, setQ] = useState("");
-  const [ans, setAns] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState(["מערכת מוכנה."]);
-
-  const addLog = (msg) => setLogs(prev => [...prev, msg]);
-
-  const askAi = async () => {
-    if (!q.trim()) return;
-    setLoading(true);
-    setAns("מנתחת נתונים... 🌸");
-    setLogs(["מתחיל תהליך..."]);
-
-    try {
-      // תמיכה בשני סוגי המשתנים + מניעת שגיאות Undefined
-      let rawKey = "";
-      if (typeof process !== "undefined" && process.env?.REACT_APP_GEMINI_KEY) {
-        rawKey = process.env.REACT_APP_GEMINI_KEY;
-      } else if (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_KEY) {
-        rawKey = import.meta.env.VITE_GEMINI_KEY;
-      }
-
-      if (!rawKey || rawKey === "undefined") {
-        addLog("❌ שגיאה: לא נמצא מפתח ב-Vercel.");
-        setLoading(false);
-        return;
-      }
-
-      // חיתוך אגרסיבי של כל תו שהוא לא אות, מספר או מקף - מונע שגיאות 404 לחלוטין!
-      const apiKey = String(rawKey).replace(/[^a-zA-Z0-9_-]/g, "");
-      addLog(`✅ מפתח נטען. (אורך: ${apiKey.length} תווים)`);
-
-      const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
-      
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      addLog("🚀 שולח בקשה לגוגל...");
-
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה ועניינית.` }] }] })
-      });
-
-      addLog(`📥 תשובה התקבלה. סטטוס: ${res.status}`);
-
-      if (!res.ok) {
-        const errText = await res.text();
-        addLog(`❌ שגיאת רשת: ${errText.substring(0, 80)}...`);
-        throw new Error(`HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-
-      const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (finalAnswer) {
-        setAns(finalAnswer);
-        addLog("✅ התשובה הוצגה.");
-      } else {
-        throw new Error("מבנה נתונים לא מזוהה.");
-      }
-
-    } catch (err) {
-      setAns("סליחה, תקלה בניתוח הנתונים.");
-      addLog(`⚠️ שגיאה: ${err.message}`);
-    }
-    setLoading(false);
-  };
-
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-      
-      {/* מסך טכנאי עם היסטוריית לוגים */}
-      <div style={{background: '#1e293b', color: '#4ade80', padding: '12px', borderRadius: '12px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', maxHeight: '110px', overflowY: 'auto'}}>
-        {logs.map((l, i) => <div key={i} style={{marginBottom: '4px'}}>{l}</div>)}
-      </div>
-
-      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
-      
-      {ans && <div style={S.aiResponse}>{ans}</div>}
-      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
-    </div></div>
-  );
-}
-
-// ── Components (Unchanged Visuals) ─────────────────────────────────────────
+// ── Components ──────────────────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -256,6 +166,129 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
         </button>
       </div>
     </div>
+  );
+}
+
+// ── AI Component (BROAD DIAGNOSTICS) ───────────────────────────────────────
+function AiModal({ events, onClose }) {
+  const [q, setQ] = useState("");
+  const [ans, setAns] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [logs, setLogs] = useState(["מתחיל בדיקות עומק..."]);
+
+  const addLog = (msg) => setLogs(prev => [...prev, msg]);
+
+  // סריקת סביבות עבודה ללא התניות מורכבות שמבלבלות את השרת
+  useEffect(() => {
+    let foundKey = null;
+
+    try {
+      addLog("1. מחפש מפתח מסוג REACT_APP...");
+      const reactKey = process.env.REACT_APP_GEMINI_KEY;
+      if (reactKey) {
+        foundKey = reactKey;
+        addLog(`✅ נמצא מפתח CRA: ${reactKey.substring(0, 4)}...`);
+      } else {
+        addLog("❌ המשתנה REACT_APP_GEMINI_KEY ריק/חסר.");
+      }
+    } catch (e) {
+      addLog("⚠️ שגיאה בקריאת process.env");
+    }
+
+    try {
+      addLog("2. מחפש מפתח מסוג VITE...");
+      // אנו משתמשים במשתנה 'import' רק אם הוא קיים
+      if (typeof import.meta !== "undefined" && import.meta.env) {
+        const viteKey = import.meta.env.VITE_GEMINI_KEY;
+        if (viteKey) {
+          foundKey = viteKey;
+          addLog(`✅ נמצא מפתח VITE: ${viteKey.substring(0, 4)}...`);
+        } else {
+          addLog("❌ המשתנה VITE_GEMINI_KEY ריק.");
+        }
+      }
+    } catch (e) {}
+
+    if (!foundKey) {
+      addLog("🚨 מסקנה: Vercel לא הזריק שום מפתח לקוד.");
+      addLog("👉 הפתרון: ודא שב-Vercel יש משתנה REACT_APP_GEMINI_KEY ועשה Redeploy.");
+    } else {
+      addLog("🎉 המפתח נטען. מוכן לשליחה!");
+    }
+  }, []);
+
+  const askAi = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setAns("מנתחת נתונים... 🌸");
+    
+    try {
+      let rawKey = null;
+      try { rawKey = process.env.REACT_APP_GEMINI_KEY; } catch(e){}
+      if (!rawKey) {
+        try { rawKey = import.meta.env.VITE_GEMINI_KEY; } catch(e){}
+      }
+
+      if (!rawKey) {
+        addLog("❌ חסימה: אין מפתח לשלוח לגוגל.");
+        setLoading(false);
+        return;
+      }
+
+      // מגלח רווחים ואנטרים נסתרים
+      const apiKey = rawKey.trim().replace(/[^a-zA-Z0-9_-]/g, "");
+
+      const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
+      
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      addLog("🚀 שולח בקשה לשרתי גוגל...");
+
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה ועניינית.` }] }] })
+      });
+
+      addLog(`📥 תשובה התקבלה. קוד סטטוס HTTP: ${res.status}`);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        addLog(`❌ שגיאת רשת מגוגל: ${errText.substring(0, 50)}...`);
+        throw new Error(`HTTP Error ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message);
+
+      const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (finalAnswer) {
+        setAns(finalAnswer);
+        addLog("✅ התשובה פוענחה בהצלחה.");
+      } else {
+        throw new Error("מבנה נתונים מגוגל לא תקין.");
+      }
+
+    } catch (err) {
+      setAns("סליחה, תקלה בניתוח הנתונים.");
+      addLog(`⚠️ תקלה כללית: ${err.message}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
+      
+      <div style={{background: '#1e293b', color: '#4ade80', padding: '12px', borderRadius: '12px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', maxHeight: '120px', overflowY: 'auto'}}>
+        {logs.map((l, i) => <div key={i} style={{marginBottom: '4px'}}>{l}</div>)}
+      </div>
+
+      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
+      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
+      
+      {ans && <div style={S.aiResponse}>{ans}</div>}
+      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
+    </div></div>
   );
 }
 
@@ -477,7 +510,6 @@ function ForecastModal({ events, onClose }) {
   );
 }
 
-// ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
