@@ -115,7 +115,7 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      {/* AI Floating Button */}
+      {/* כפתור ה-AI המרחף */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
@@ -131,7 +131,7 @@ export default function BabyApp() {
   );
 }
 
-// ── AI Component (DIAGNOSTIC MODE) ──────────────────────────────────────────
+// ── AI Component (DIAGNOSTIC MODE WITH CREATE REACT APP VARS) ───────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
@@ -139,9 +139,10 @@ function AiModal({ events, onClose }) {
   const [debugLog, setDebugLog] = useState("מתחיל בדיקת מערכת...");
 
   useEffect(() => {
-    const key = import.meta.env.VITE_GEMINI_KEY;
+    // מושך את המשתנה בשיטה של Create React App
+    const key = process.env.REACT_APP_GEMINI_KEY;
     if (!key) {
-      setDebugLog("❌ שגיאה: לא נמצא מפתח VITE_GEMINI_KEY ב-Vercel. האם עשית Redeploy?");
+      setDebugLog("❌ שגיאה: לא נמצא מפתח REACT_APP_GEMINI_KEY ב-Vercel. נא לוודא שם משתנה ו-Redeploy.");
     } else {
       setDebugLog(`✅ מפתח זוהה (מתחיל ב-${key.substring(0, 5)}...) מוכן לפעולה.`);
     }
@@ -154,12 +155,10 @@ function AiModal({ events, onClose }) {
     setDebugLog("⏳ מכין נתונים לשליחה...");
 
     try {
-      const apiKey = import.meta.env.VITE_GEMINI_KEY;
+      const apiKey = process.env.REACT_APP_GEMINI_KEY;
       if (!apiKey) throw new Error("Missing API Key");
 
-      // לוקח רק את 15 האירועים האחרונים כדי לא להעמיס
       const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
-      
       setDebugLog("🚀 שולח בקשה לגוגל...");
       
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
@@ -176,10 +175,7 @@ function AiModal({ events, onClose }) {
       }
 
       const data = await res.json();
-      
-      if (data.error) {
-        throw new Error(data.error.message);
-      }
+      if (data.error) throw new Error(data.error.message);
 
       const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (finalAnswer) {
@@ -214,7 +210,7 @@ function AiModal({ events, onClose }) {
   );
 }
 
-// ── Components (Unchanged) ──────────────────────────────────────────────────
+// ── Components ──────────────────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
