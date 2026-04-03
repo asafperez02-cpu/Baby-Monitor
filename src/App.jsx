@@ -115,7 +115,7 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      {/* כפתור ה-AI המרחף */}
+      {/* כפתור העוזרת החכמה */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
       <div style={S.nav}>
@@ -131,48 +131,57 @@ export default function BabyApp() {
   );
 }
 
-// ── AI Component (DIAGNOSTIC MODE + TRIM) ──────────────────────────────────
+// ── AI Component (BULLETPROOF DIAGNOSTIC MODE) ─────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const [debugLog, setDebugLog] = useState("מתחיל בדיקת מערכת...");
+  const [logs, setLogs] = useState(["מערכת מוכנה."]);
 
-  useEffect(() => {
-    const key = process.env.REACT_APP_GEMINI_KEY;
-    if (!key) {
-      setDebugLog("❌ שגיאה: לא נמצא מפתח REACT_APP_GEMINI_KEY ב-Vercel. נא לוודא שם משתנה ו-Redeploy.");
-    } else {
-      setDebugLog(`✅ מפתח זוהה (מתחיל ב-${key.trim().substring(0, 5)}...) מוכן לפעולה.`);
-    }
-  }, []);
+  const addLog = (msg) => setLogs(prev => [...prev, msg]);
 
   const askAi = async () => {
     if (!q.trim()) return;
     setLoading(true);
     setAns("מנתחת נתונים... 🌸");
-    setDebugLog("⏳ מכין נתונים לשליחה...");
+    setLogs(["מתחיל תהליך..."]);
 
     try {
-      // כאן התיקון הקריטי: trim() מנקה רווחים וירידות שורה נסתרות מהמפתח
-      const rawKey = process.env.REACT_APP_GEMINI_KEY;
-      if (!rawKey) throw new Error("Missing API Key");
-      const apiKey = rawKey.trim();
+      // תמיכה בשני סוגי המשתנים + מניעת שגיאות Undefined
+      let rawKey = "";
+      if (typeof process !== "undefined" && process.env?.REACT_APP_GEMINI_KEY) {
+        rawKey = process.env.REACT_APP_GEMINI_KEY;
+      } else if (typeof import.meta !== "undefined" && import.meta.env?.VITE_GEMINI_KEY) {
+        rawKey = import.meta.env.VITE_GEMINI_KEY;
+      }
+
+      if (!rawKey || rawKey === "undefined") {
+        addLog("❌ שגיאה: לא נמצא מפתח ב-Vercel.");
+        setLoading(false);
+        return;
+      }
+
+      // חיתוך אגרסיבי של כל תו שהוא לא אות, מספר או מקף - מונע שגיאות 404 לחלוטין!
+      const apiKey = String(rawKey).replace(/[^a-zA-Z0-9_-]/g, "");
+      addLog(`✅ מפתח נטען. (אורך: ${apiKey.length} תווים)`);
 
       const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
-      setDebugLog("🚀 שולח בקשה לגוגל...");
       
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      addLog("🚀 שולח בקשה לגוגל...");
+
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה מאוד.` }] }] })
+        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה ועניינית.` }] }] })
       });
 
-      setDebugLog(`📥 התקבלה תגובה מהשרת. סטטוס: ${res.status}`);
+      addLog(`📥 תשובה התקבלה. סטטוס: ${res.status}`);
 
       if (!res.ok) {
         const errText = await res.text();
-        throw new Error(`HTTP ${res.status} - ${errText.substring(0, 50)}...`);
+        addLog(`❌ שגיאת רשת: ${errText.substring(0, 80)}...`);
+        throw new Error(`HTTP ${res.status}`);
       }
 
       const data = await res.json();
@@ -181,14 +190,14 @@ function AiModal({ events, onClose }) {
       const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
       if (finalAnswer) {
         setAns(finalAnswer);
-        setDebugLog("✅ התשובה פוענחה בהצלחה.");
+        addLog("✅ התשובה הוצגה.");
       } else {
-        throw new Error("מבנה התשובה מגוגל לא מוכר.");
+        throw new Error("מבנה נתונים לא מזוהה.");
       }
 
     } catch (err) {
-      setAns("הייתה בעיה בניתוח הנתונים.");
-      setDebugLog(`❌ שגיאה: ${err.message}`);
+      setAns("סליחה, תקלה בניתוח הנתונים.");
+      addLog(`⚠️ שגיאה: ${err.message}`);
     }
     setLoading(false);
   };
@@ -197,8 +206,9 @@ function AiModal({ events, onClose }) {
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
       
-      <div style={{background: '#1e293b', color: '#4ade80', padding: '10px', borderRadius: '10px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace'}}>
-        > {debugLog}
+      {/* מסך טכנאי עם היסטוריית לוגים */}
+      <div style={{background: '#1e293b', color: '#4ade80', padding: '12px', borderRadius: '12px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', maxHeight: '110px', overflowY: 'auto'}}>
+        {logs.map((l, i) => <div key={i} style={{marginBottom: '4px'}}>{l}</div>)}
       </div>
 
       <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
@@ -210,7 +220,7 @@ function AiModal({ events, onClose }) {
   );
 }
 
-// ── Components ──────────────────────────────────────────────────────────────
+// ── Components (Unchanged Visuals) ─────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -467,6 +477,7 @@ function ForecastModal({ events, onClose }) {
   );
 }
 
+// ── Styles ─────────────────────────────────────────────────────────────────
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
@@ -482,7 +493,6 @@ const S = {
   card: { background: "#fffaf7", borderRadius: "32px", padding: "20px", boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
   cardTitle: { fontSize: 21, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
   
-  // Dashboard Summary blocks
   summaryDashboard: { display: 'flex', background: C.creamSoft, borderRadius: '20px', padding: '15px', marginBottom: '20px', border: `1px solid ${C.border}` },
   summaryColLeft: { flex: 1, textAlign: 'center', borderLeft: `1px solid ${C.border}` },
   summaryColRight: { flex: 1, textAlign: 'center' },
@@ -501,7 +511,6 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  // AI Elements added safely
   aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   aiResponse: { marginTop: 15, padding: "15px", background: C.creamSoft, borderRadius: "15px", fontSize: 15, fontWeight: 700, color: C.text, border: `1px solid ${C.border}` },
   
