@@ -115,6 +115,9 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
+      {/* AI Floating Button */}
+      <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
+
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ALMA</button>
         <button onClick={() => setTab("analytics")} style={S.navBtn(tab === "analytics")}>📊 נתונים</button>
@@ -123,11 +126,95 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
-// ── Components ──────────────────────────────────────────────────────────────
+// ── AI Component (DIAGNOSTIC MODE) ──────────────────────────────────────────
+function AiModal({ events, onClose }) {
+  const [q, setQ] = useState("");
+  const [ans, setAns] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [debugLog, setDebugLog] = useState("מתחיל בדיקת מערכת...");
+
+  useEffect(() => {
+    const key = import.meta.env.VITE_GEMINI_KEY;
+    if (!key) {
+      setDebugLog("❌ שגיאה: לא נמצא מפתח VITE_GEMINI_KEY ב-Vercel. האם עשית Redeploy?");
+    } else {
+      setDebugLog(`✅ מפתח זוהה (מתחיל ב-${key.substring(0, 5)}...) מוכן לפעולה.`);
+    }
+  }, []);
+
+  const askAi = async () => {
+    if (!q.trim()) return;
+    setLoading(true);
+    setAns("מנתחת נתונים... 🌸");
+    setDebugLog("⏳ מכין נתונים לשליחה...");
+
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_KEY;
+      if (!apiKey) throw new Error("Missing API Key");
+
+      // לוקח רק את 15 האירועים האחרונים כדי לא להעמיס
+      const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
+      
+      setDebugLog("🚀 שולח בקשה לגוגל...");
+      
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה מאוד.` }] }] })
+      });
+
+      setDebugLog(`📥 התקבלה תגובה מהשרת. סטטוס: ${res.status}`);
+
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`HTTP ${res.status} - ${errText.substring(0, 50)}...`);
+      }
+
+      const data = await res.json();
+      
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (finalAnswer) {
+        setAns(finalAnswer);
+        setDebugLog("✅ התשובה פוענחה בהצלחה.");
+      } else {
+        throw new Error("מבנה התשובה מגוגל לא מוכר.");
+      }
+
+    } catch (err) {
+      setAns("הייתה בעיה בניתוח הנתונים.");
+      setDebugLog(`❌ שגיאה: ${err.message}`);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
+      
+      {/* מסך חיווי טכנאי */}
+      <div style={{background: '#1e293b', color: '#4ade80', padding: '10px', borderRadius: '10px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace'}}>
+        > {debugLog}
+      </div>
+
+      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
+      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
+      
+      {ans && <div style={S.aiResponse}>{ans}</div>}
+      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
+    </div></div>
+  );
+}
+
+// ── Components (Unchanged) ──────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -153,7 +240,6 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
         <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
       </div>
 
-      {/* רובריקת ארוחה הבאה משודרגת */}
       <div style={{display:'flex', justifyContent:'center', marginTop: 20}}>
         <button onClick={onOpenForecast} style={S.forecastBtn}>
           <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark, marginBottom: 5}}>4 ארוחות הבאות</div>
@@ -194,7 +280,6 @@ function HomeView({ events, setModal, onDelete }) {
       <div style={S.card}>
         <div className="kids-font" style={S.cardTitle}>היום של עלמה</div>
         
-        {/* בלוק סיכום נתונים יומיים משודרג */}
         <div style={S.summaryDashboard}>
           <div style={S.summaryColLeft}>
             <div style={S.summaryLabel}>סה"כ אוכל</div>
@@ -419,6 +504,11 @@ const S = {
   delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer' },
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
+  
+  // AI Elements added safely
+  aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
+  aiResponse: { marginTop: 15, padding: "15px", background: C.creamSoft, borderRadius: "15px", fontSize: 15, fontWeight: 700, color: C.text, border: `1px solid ${C.border}` },
+  
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "92%", maxWidth: 380 },
   chip: (active) => ({ flex: 1, padding: "14px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
