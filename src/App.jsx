@@ -81,7 +81,7 @@ export default function BabyApp() {
   return (
     <div style={S.app}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Varela+Round&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Varela Round&display=swap');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
@@ -169,123 +169,45 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
   );
 }
 
-// ── AI Component (BROAD DIAGNOSTICS) ───────────────────────────────────────
+// ── AI Component ───────────────────────────────────────────────────────────
 function AiModal({ events, onClose }) {
   const [q, setQ] = useState("");
   const [ans, setAns] = useState("");
   const [loading, setLoading] = useState(false);
-  const [logs, setLogs] = useState(["מתחיל בדיקות עומק..."]);
-
-  const addLog = (msg) => setLogs(prev => [...prev, msg]);
-
-  // סריקת סביבות עבודה ללא התניות מורכבות שמבלבלות את השרת
-  useEffect(() => {
-    let foundKey = null;
-
-    try {
-      addLog("1. מחפש מפתח מסוג REACT_APP...");
-      const reactKey = process.env.REACT_APP_GEMINI_KEY;
-      if (reactKey) {
-        foundKey = reactKey;
-        addLog(`✅ נמצא מפתח CRA: ${reactKey.substring(0, 4)}...`);
-      } else {
-        addLog("❌ המשתנה REACT_APP_GEMINI_KEY ריק/חסר.");
-      }
-    } catch (e) {
-      addLog("⚠️ שגיאה בקריאת process.env");
-    }
-
-    try {
-      addLog("2. מחפש מפתח מסוג VITE...");
-      // אנו משתמשים במשתנה 'import' רק אם הוא קיים
-      if (typeof import.meta !== "undefined" && import.meta.env) {
-        const viteKey = import.meta.env.VITE_GEMINI_KEY;
-        if (viteKey) {
-          foundKey = viteKey;
-          addLog(`✅ נמצא מפתח VITE: ${viteKey.substring(0, 4)}...`);
-        } else {
-          addLog("❌ המשתנה VITE_GEMINI_KEY ריק.");
-        }
-      }
-    } catch (e) {}
-
-    if (!foundKey) {
-      addLog("🚨 מסקנה: Vercel לא הזריק שום מפתח לקוד.");
-      addLog("👉 הפתרון: ודא שב-Vercel יש משתנה REACT_APP_GEMINI_KEY ועשה Redeploy.");
-    } else {
-      addLog("🎉 המפתח נטען. מוכן לשליחה!");
-    }
-  }, []);
 
   const askAi = async () => {
     if (!q.trim()) return;
     setLoading(true);
     setAns("מנתחת נתונים... 🌸");
-    
+
     try {
-      let rawKey = null;
-      try { rawKey = process.env.REACT_APP_GEMINI_KEY; } catch(e){}
-      if (!rawKey) {
-        try { rawKey = import.meta.env.VITE_GEMINI_KEY; } catch(e){}
-      }
+      const history = events
+        .slice(0, 15)
+        .map(e => `${fmtTime(e.ts)}: ${e.type === "feed" ? `אכלה ${e.ml}ml` : "חיתול"}`)
+        .join(", ");
 
-      if (!rawKey) {
-        addLog("❌ חסימה: אין מפתח לשלוח לגוגל.");
-        setLoading(false);
-        return;
-      }
-
-      // מגלח רווחים ואנטרים נסתרים
-      const apiKey = rawKey.trim().replace(/[^a-zA-Z0-9_-]/g, "");
-
-      const history = events.slice(0, 15).map(e => `${fmtTime(e.ts)}: ${e.type === 'feed' ? `אכלה ${e.ml}ml` : 'חיתול'}`).join(', ');
-      
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-      addLog("🚀 שולח בקשה לשרתי גוגל...");
-
-      const res = await fetch(url, {
+      const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: `הנה נתוני התינוקת עלמה: ${history}. שאלה: ${q}. ענה בעברית קצרה ועניינית.` }] }] })
+        body: JSON.stringify({ question: q, history }),
       });
 
-      addLog(`📥 תשובה התקבלה. קוד סטטוס HTTP: ${res.status}`);
-
-      if (!res.ok) {
-        const errText = await res.text();
-        addLog(`❌ שגיאת רשת מגוגל: ${errText.substring(0, 50)}...`);
-        throw new Error(`HTTP Error ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json();
-      if (data.error) throw new Error(data.error.message);
-
-      const finalAnswer = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (finalAnswer) {
-        setAns(finalAnswer);
-        addLog("✅ התשובה פוענחה בהצלחה.");
-      } else {
-        throw new Error("מבנה נתונים מגוגל לא תקין.");
-      }
-
+      setAns(data.answer || "לא התקבלה תשובה.");
     } catch (err) {
       setAns("סליחה, תקלה בניתוח הנתונים.");
-      addLog(`⚠️ תקלה כללית: ${err.message}`);
     }
+
     setLoading(false);
   };
 
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-      
-      <div style={{background: '#1e293b', color: '#4ade80', padding: '12px', borderRadius: '12px', fontSize: '11px', marginBottom: '15px', direction: 'ltr', textAlign: 'left', fontFamily: 'monospace', maxHeight: '120px', overflowY: 'auto'}}>
-        {logs.map((l, i) => <div key={i} style={{marginBottom: '4px'}}>{l}</div>)}
-      </div>
-
       <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
       <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
-      
       {ans && <div style={S.aiResponse}>{ans}</div>}
       <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
     </div></div>
