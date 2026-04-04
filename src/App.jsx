@@ -27,6 +27,15 @@ const DiaperIcon = ({ size = 26, color = "#701a75" }) => (
   </svg>
 );
 
+const BearClockIcon = ({ size = 42, color = C.peachDark }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="13" r="8" stroke={color} strokeWidth="2" fill={C.creamSoft}/>
+    <circle cx="6" cy="6" r="3" stroke={color} strokeWidth="2" fill={C.creamSoft}/>
+    <circle cx="18" cy="6" r="3" stroke={color} strokeWidth="2" fill={C.creamSoft}/>
+    <path d="M12 10V13L14 15" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
 // ── Helpers ────────────────────────────────────────────────────────────────
 function isToday(ts) { return new Date(ts).toDateString() === new Date().toDateString(); }
 function formatEventTime(ts) {
@@ -80,6 +89,7 @@ export default function BabyApp() {
   };
 
   const vitaminDone = events.some(e => e.type === "vitaminD" && isToday(e.ts));
+  const bathDone = events.some(e => e.type === "bath" && isToday(e.ts));
 
   return (
     <div style={S.app}>
@@ -107,15 +117,26 @@ export default function BabyApp() {
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
         
-        {!vitaminDone && (
-          <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => {
-            addEvent({ type: "vitaminD" });
-          }}>
-            <span>☀️ ויטמין D לעלמה</span>
-            <input type="checkbox" readOnly checked={false} style={{transform:'scale(1.2)'}} />
-          </div>
-        )}
+        {/* כפתורי ויטמין ומקלחת - זה לצד זה */}
+        <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
+          <button
+            onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })}
+            style={{...S.dailyTaskBtn, background: vitaminDone ? 'rgba(255,255,255,0.3)' : (new Date(now).getHours() < 12 ? C.success : C.warning), color: vitaminDone ? 'white' : 'white', cursor: vitaminDone ? 'default' : 'pointer'}}
+          >
+            <span style={{fontSize: 22}}>{vitaminDone ? '✅' : '☀️'}</span>
+            <span style={{fontSize: 14}}>ויטמין D</span>
+          </button>
 
+          <button
+            onClick={() => !bathDone && addEvent({ type: "bath" })}
+            style={{...S.dailyTaskBtn, background: bathDone ? 'rgba(255,255,255,0.3)' : C.blueSoft, color: bathDone ? 'white' : C.text, cursor: bathDone ? 'default' : 'pointer'}}
+          >
+            <span style={{fontSize: 22}}>{bathDone ? '✅' : '🛁'}</span>
+            <span style={{fontSize: 14}}>מקלחת</span>
+          </button>
+        </div>
+
+        <NetaTicker now={now} />
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
         <ProactiveTicker events={events} vitaminDone={vitaminDone} now={now} />
       </div>
@@ -125,7 +146,6 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
-      {/* Floating Action Buttons המרחפים הנקיים */}
       <button onClick={() => setModal("handoff")} style={S.handoffFab}>🧸</button>
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
 
@@ -143,7 +163,38 @@ export default function BabyApp() {
   );
 }
 
-// ── Proactive Ticker (Breathing Insights) ─────────────────────────────────
+// ── Neta Compliment Ticker ────────────────────────────────────────────────
+function NetaTicker({ now }) {
+  const compliments = [
+    "נטע, את יפה ונכונה 👑",
+    "אמא של עלמה - את פשוט וואו! 💫",
+    "הלילות קשים, אבל את נראית מיליון דולר ✨",
+    "אין אמהות כמוך בעולם (וגם לא נשים) ❤️",
+    "אסף זכה, עלמה זכתה, ואנחנו זכינו בך 🏆",
+    "יש לך חיוך שמאיר את כל ניר צבי 🌟",
+    "את מתמודדת עם הכל כמו לביאה אמיתית 🦁",
+    "מגיע לך פטור מכלים לכל השבוע 🍽️",
+    "נטע, כולם יודעים שאת הבוס האמיתי פה 💅",
+    "גם בפיג'מה של 3 בבוקר, את הכי יפה בארץ 😍",
+    "סופרוומן ביקשה ממך טיפים אתמול, נכון? 🦸‍♀️",
+    "האהבה שלך לעלמה ולינאי זה הדבר הכי יפה בעולם 🥰"
+  ];
+  
+  // מתחלף אוטומטית כל שעתיים לפי השעון המקומי
+  const index = Math.floor(now / (1000 * 60 * 60 * 2)) % compliments.length;
+  const current = compliments[index];
+
+  return (
+    <div style={{ textAlign: 'center', marginBottom: 15, animation: 'fadeInOut 4s ease-in-out infinite' }}>
+      <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #f9a8d4, #f4a58a)', color: 'white', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 900, boxShadow: '0 4px 15px rgba(249, 168, 212, 0.4)' }}>
+        {current}
+      </div>
+    </div>
+  );
+}
+
+
+// ── Proactive Ticker (הטיקר הנושם) ────────────────────────────────────────
 function ProactiveTicker({ events, vitaminDone, now }) {
   const [index, setIndex] = useState(0);
   const insights = [];
@@ -161,7 +212,6 @@ function ProactiveTicker({ events, vitaminDone, now }) {
     insights.push({ icon: "☀️", text: "טרם ניתן ויטמין D היום", color: C.warning });
   }
 
-  // הוספת תובנה ברירת מחדל חיובית אם אין חריגות
   if (insights.length === 0) {
     insights.push({ icon: "✨", text: "הכל מושלם! עלמה במסלול המדויק", color: C.peachDark });
   }
@@ -224,8 +274,8 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
       </div>
 
       <div style={{display:'flex', justifyContent:'center', marginTop: 20}}>
-        <button onClick={onOpenForecast} style={S.forecastBtn}>
-          <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark}}>תחזית ויישור זמני לילה ⏰</div>
+        <button onClick={onOpenForecast} style={{ background: "white", border: "none", width: 65, height: 65, borderRadius: 35, boxShadow: "0 8px 20px rgba(0,0,0,0.1)", cursor: "pointer", display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <BearClockIcon size={40} />
         </button>
       </div>
     </div>
@@ -240,11 +290,10 @@ function ForecastModal({ events, onClose }) {
   // טור ימין: תחזית קשיחה של בדיוק 4 שעות מרווח
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
-  // טור שמאל: האלגוריתם החכם שמתאים מרווחים כדי לנחות ב-23:15
+  // טור שמאל: האלגוריתם החכם שמחשב תיקון *מקביל* לכל שורה
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
-  // בניית רשימת יעדי העוגן שלנו ליומיים הקרובים (06:45, 23:15, 03:15)
   const anchors = [];
   const baseDate = new Date(currentTs);
   baseDate.setHours(0,0,0,0);
@@ -252,11 +301,10 @@ function ForecastModal({ events, onClose }) {
     const d = new Date(baseDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
     anchors.push(new Date(d).setHours(6, 45, 0, 0));
     anchors.push(new Date(d).setHours(23, 15, 0, 0));
-    anchors.push(new Date(d).setHours(3, 15, 0, 0)); // השעה 03:15 שייכת לאותו יום מבחינת Date אובייקט
+    anchors.push(new Date(d).setHours(3, 15, 0, 0)); 
   }
   
-  // מסננים עוגנים שכבר עברו וממיינים לפי הזמן הקרוב ביותר
-  let futureAnchors = anchors.filter(a => a > currentTs).sort((a,b) => a - b);
+  let futureAnchors = anchors.filter(a => a > currentTs + 5 * 60 * 1000).sort((a,b) => a - b);
 
   for (let i = 0; i < 4; i++) {
     if (futureAnchors.length === 0) break; 
@@ -264,7 +312,6 @@ function ForecastModal({ events, onClose }) {
     let targetAnchor = futureAnchors[0];
     let diffMs = targetAnchor - currentTs;
     
-    // אם אנחנו כבר ממש על העוגן (או קרובים מדי), עוברים לעוגן הבא
     if (diffMs < 5 * 60 * 1000) {
         futureAnchors.shift();
         if (futureAnchors.length === 0) break;
@@ -272,11 +319,9 @@ function ForecastModal({ events, onClose }) {
         diffMs = targetAnchor - currentTs;
     }
 
-    // מחשבים כמה ארוחות צריך לדחוס עד העוגן (מקסימום 4 שעות לארוחה)
     let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
     if (steps === 0) steps = 1;
     
-    // מחלקים את הזמן שנותר למרווחים שווים כדי לנחות בדיוק על היעד
     let interval = diffMs / steps;
     currentTs += interval;
     smartFuture.push(new Date(currentTs));
@@ -291,7 +336,7 @@ function ForecastModal({ events, onClose }) {
           {/* עמודה ימנית (קשיחה) */}
           <div style={{flex: 1, background: '#f8fafc', padding: 10, borderRadius: 15, border: '1px solid #e2e8f0'}}>
             <div style={{fontWeight: 800, fontSize: 13, color: C.textSoft, textAlign: 'center', marginBottom: 15, height: 35}}>
-              תחזית קשיחה<br/>(כל 4 שעות בדיוק)
+              מרווח קשיח<br/>(כל 4 שעות בדיוק)
             </div>
             {dumbFuture.map((t, i) => (
               <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #cbd5e1' : 'none'}}>
@@ -300,10 +345,10 @@ function ForecastModal({ events, onClose }) {
             ))}
           </div>
 
-          {/* עמודה שמאלית (חכמה) */}
+          {/* עמודה שמאלית (התיקון החכם) */}
           <div style={{flex: 1, background: '#ecfdf5', padding: 10, borderRadius: 15, border: '1px solid #a7f3d0'}}>
             <div style={{fontWeight: 900, fontSize: 13, color: C.success, textAlign: 'center', marginBottom: 15, height: 35}}>
-              יישור למטרה<br/>(נחיתה ב-23:15)
+              התיקון המומלץ<br/>(יישור ל-23:15)
             </div>
             {smartFuture.map((t, i) => (
               <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #a7f3d0' : 'none'}}>
@@ -314,18 +359,17 @@ function ForecastModal({ events, onClose }) {
         </div>
 
         <div style={{fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
-          <strong>איך העמודה הירוקה מחושבת?</strong><br/>
-          האלגוריתם מותח או מכווץ את המרווחים באופן שווה (אך לא יותר מ-4 שעות) כדי להכווין את הארוחה המכרעת ישירות ל-<strong>23:15</strong>. לאחר מכן, הוא מתיישר ליעדים הבאים: <strong>03:15</strong> ו-<strong>06:45</strong> כדי להסתנכרן עם הבוקר של ינאי.
+          <strong>איך התיקון הירוק עובד?</strong><br/>
+          האלגוריתם מציג לך מקבילה חכמה לכל ארוחה. הוא מותח או מכווץ את הזמנים במידה שווה כדי שהארוחות הבאות יובילו אותך ישר לנחיתה ב-<strong>23:15</strong>, <strong>03:15</strong> ו-<strong>06:45</strong>.
         </div>
 
-        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, סגור</button>
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
       </div>
     </div>
   );
 }
 
-
-// ── Shift Handoff Modal (תקציר מנהלים) ────────────────────────────────────
+// ── Shift Handoff Modal (תקציר משמרת) ─────────────────────────────────────
 function HandoffModal({ events, vitaminDone, onClose }) {
   const now = Date.now();
   const shiftHours = 6;
@@ -339,6 +383,8 @@ function HandoffModal({ events, vitaminDone, onClose }) {
   const diapers = shiftEvents.filter(e => e.type === "diaper");
   const peeCount = diapers.filter(e => e.pee).length;
   const poopCount = diapers.filter(e => e.poop).length;
+  
+  const bathDoneShift = shiftEvents.some(e => e.type === "bath");
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -368,14 +414,19 @@ function HandoffModal({ events, vitaminDone, onClose }) {
           </div>
 
           <div style={{marginBottom: 20}}>
-            <h4 style={{color: C.purpleDark, margin: '0 0 10px', fontSize: 18}}>🧻 החתלות</h4>
+            <h4 style={{color: C.purpleDark, margin: '0 0 10px', fontSize: 18}}>🧻 טיפול והחתלה</h4>
             <div style={{background: C.pastelPurple, padding: 15, borderRadius: 15}}>
               <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
                 <span style={{fontWeight: 800}}>פיפי 💧:</span><span style={{fontWeight: 900}}>{peeCount} חיתולים</span>
               </div>
-              <div style={{display:'flex', justifyContent:'space-between'}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom: bathDoneShift ? 5 : 0}}>
                 <span style={{fontWeight: 800}}>קקי 💩:</span><span style={{fontWeight: 900}}>{poopCount} חיתולים</span>
               </div>
+              {bathDoneShift && (
+                <div style={{display:'flex', justifyContent:'space-between', borderTop: '1px dotted #cbd5e1', paddingTop: 5, marginTop: 5}}>
+                  <span style={{fontWeight: 800}}>מקלחת 🛁:</span><span style={{fontWeight: 900, color: C.success}}>עשתה היום!</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -395,7 +446,7 @@ function HandoffModal({ events, vitaminDone, onClose }) {
   );
 }
 
-
+// ── Views ───────────────────────────────────────────────────────────────
 function HomeView({ events, setModal, onDelete }) {
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
   const todayDiapers = events.filter(e => e.type === "diaper" && isToday(e.ts));
@@ -632,6 +683,7 @@ function AiChatModal({ events, vitaminDone, onClose }) {
           if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
           if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
           if (e.type === "vitaminD") return { ...base, type: "vitaminD" }; 
+          if (e.type === "bath") return { ...base, type: "bath" }; // המודל קורא גם מתי עלמה התקלחה
           return null;
         }).filter(Boolean)
       };
@@ -708,11 +760,12 @@ const S = {
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 20px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 13, color: "white", fontWeight: 700, opacity: 0.9, marginBottom: 5 },
   babyBadge: { fontSize: 44, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
-  vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
+  
+  dailyTaskBtn: { flex: 1, padding: '12px 10px', borderRadius: '15px', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 },
+  
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "35px", padding: "20px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
   progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s ease' },
-  forecastBtn: { background: "white", border: "none", width: "100%", padding: "15px", borderRadius: "22px", boxShadow: "0 8px 20px rgba(0,0,0,0.08)", cursor: "pointer", display:'flex', flexDirection: 'column', alignItems:'center', justifyContent:'center' },
   content: { flex: 1, overflowY: "auto", padding: "25px 15px 120px" },
   actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "26px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
   card: { background: "#fffaf7", borderRadius: "32px", padding: "20px", boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
@@ -736,7 +789,6 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  // הלחצנים המרחפים הנקיים
   aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   
