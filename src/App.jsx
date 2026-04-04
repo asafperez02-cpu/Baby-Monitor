@@ -98,12 +98,6 @@ export default function BabyApp() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; direction: rtl; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
-        @keyframes fadeInOut { 
-          0% { opacity: 0; transform: translateY(3px); } 
-          15% { opacity: 1; transform: translateY(0); } 
-          85% { opacity: 1; transform: translateY(0); } 
-          100% { opacity: 0; transform: translateY(-3px); } 
-        }
       `}</style>
 
       {showUndo && (
@@ -117,11 +111,10 @@ export default function BabyApp() {
         <div style={S.greeting}>שלום {userName} 👋</div>
         <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
         
-        {/* כפתורי ויטמין ומקלחת - זה לצד זה */}
         <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
           <button
             onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })}
-            style={{...S.dailyTaskBtn, background: vitaminDone ? 'rgba(255,255,255,0.3)' : (new Date(now).getHours() < 12 ? C.success : C.warning), color: vitaminDone ? 'white' : 'white', cursor: vitaminDone ? 'default' : 'pointer'}}
+            style={{...S.dailyTaskBtn, background: vitaminDone ? 'rgba(255,255,255,0.3)' : (new Date(now).getHours() < 12 ? C.success : C.warning), color: 'white', cursor: vitaminDone ? 'default' : 'pointer'}}
           >
             <span style={{fontSize: 22}}>{vitaminDone ? '✅' : '☀️'}</span>
             <span style={{fontSize: 14}}>ויטמין D</span>
@@ -163,38 +156,37 @@ export default function BabyApp() {
   );
 }
 
-// ── Neta Compliment Ticker ────────────────────────────────────────────────
+// ── Neta Compliment Ticker (סטטי ומתחלף כל 3 שעות) ────────────────────────
 function NetaTicker({ now }) {
   const compliments = [
-    "נטע, את יפה ונכונה 👑",
-    "אמא של עלמה - את פשוט וואו! 💫",
-    "הלילות קשים, אבל את נראית מיליון דולר ✨",
-    "אין אמהות כמוך בעולם (וגם לא נשים) ❤️",
-    "אסף זכה, עלמה זכתה, ואנחנו זכינו בך 🏆",
-    "יש לך חיוך שמאיר את כל ניר צבי 🌟",
-    "את מתמודדת עם הכל כמו לביאה אמיתית 🦁",
-    "מגיע לך פטור מכלים לכל השבוע 🍽️",
-    "נטע, כולם יודעים שאת הבוס האמיתי פה 💅",
-    "גם בפיג'מה של 3 בבוקר, את הכי יפה בארץ 😍",
-    "סופרוומן ביקשה ממך טיפים אתמול, נכון? 🦸‍♀️",
-    "האהבה שלך לעלמה ולינאי זה הדבר הכי יפה בעולם 🥰"
+    "נטע, בואי נודה באמת, את מנהלת את הבית הזה 👑",
+    "נטע, איך את מצליחה להיראות ככה גם אחרי לילה לבן? קוסמות. ✨",
+    "נטע, אסף יודע שהוא זכה בלוטו, נכון? 🏆",
+    "נטע, שמעתי שסופרוומן לוקחת ממך השראה 🦸‍♀️",
+    "נטע, את אמא פשוט נדירה (וגם חתיכה ברמות) ❤️",
+    "נטע, שתינו יודעות שהלוק המרושל שלך עדיין עוקף את כולם 💅",
+    "נטע, קחי נשימה, את עושה עבודה מדהימה עם עלמה וינאי 🥰",
+    "נטע, עלמה ביקשה למסור שאת האמא הכי שווה בגן 🌸",
+    "נטע, מי צריכה שעות שינה כשאת נראית ככה? 😍",
+    "נטע, הטיקר הזה כאן רק כדי להזכיר לך שאת מלכה 👑",
+    "נטע, אם הייתה אולימפיאדת אמהות, היית לוקחת זהב 🥇",
+    "נטע, אין ספק שעלמה קיבלה את הגנים הטובים ממך 😉"
   ];
   
-  // מתחלף אוטומטית כל שעתיים לפי השעון המקומי
-  const index = Math.floor(now / (1000 * 60 * 60 * 2)) % compliments.length;
+  // מתחלף אוטומטית פעם ב-3 שעות
+  const index = Math.floor(now / (1000 * 60 * 60 * 3)) % compliments.length;
   const current = compliments[index];
 
   return (
-    <div style={{ textAlign: 'center', marginBottom: 15, animation: 'fadeInOut 4s ease-in-out infinite' }}>
-      <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #f9a8d4, #f4a58a)', color: 'white', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 900, boxShadow: '0 4px 15px rgba(249, 168, 212, 0.4)' }}>
+    <div style={{ textAlign: 'center', marginBottom: 15 }}>
+      <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #f9a8d4, #f4a58a)', color: 'white', padding: '8px 18px', borderRadius: 20, fontSize: 13, fontWeight: 900, boxShadow: '0 4px 15px rgba(249, 168, 212, 0.4)' }}>
         {current}
       </div>
     </div>
   );
 }
 
-
-// ── Proactive Ticker (הטיקר הנושם) ────────────────────────────────────────
+// ── Proactive Ticker (התובנות של עלמה) ────────────────────────────────────
 function ProactiveTicker({ events, vitaminDone, now }) {
   const [index, setIndex] = useState(0);
   const insights = [];
@@ -231,7 +223,6 @@ function ProactiveTicker({ events, vitaminDone, now }) {
   return (
     <div style={{ marginTop: 15, height: 35, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div key={index} style={{ 
-        animation: finalInsights.length > 1 ? 'fadeInOut 4s ease-in-out infinite' : 'none', 
         background: 'rgba(255, 255, 255, 0.9)', 
         padding: '6px 16px', 
         borderRadius: 20, 
@@ -282,46 +273,36 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
   );
 }
 
-// ── Smart Night Forecast Modal (טייס אוטומטי ללילה) ───────────────────────
+// ── Smart Night Forecast Modal (יישור מדויק ל-23:15) ──────────────────────
 function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
   
-  // טור ימין: תחזית קשיחה של בדיוק 4 שעות מרווח
+  // טור ימין (קשיח): מרווח של 4 שעות רגיל
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
-  // טור שמאל: האלגוריתם החכם שמחשב תיקון *מקביל* לכל שורה
+  // טור שמאל (חכם): מחשב מסלול כדי לנחות בדיוק על 23:15 הבא
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
-  const anchors = [];
-  const baseDate = new Date(currentTs);
-  baseDate.setHours(0,0,0,0);
-  for (let dayOffset = 0; dayOffset <= 2; dayOffset++) {
-    const d = new Date(baseDate.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-    anchors.push(new Date(d).setHours(6, 45, 0, 0));
-    anchors.push(new Date(d).setHours(23, 15, 0, 0));
-    anchors.push(new Date(d).setHours(3, 15, 0, 0)); 
-  }
-  
-  let futureAnchors = anchors.filter(a => a > currentTs + 5 * 60 * 1000).sort((a,b) => a - b);
-
   for (let i = 0; i < 4; i++) {
-    if (futureAnchors.length === 0) break; 
+    // מציאת היעד הבא של 23:15 (היום או מחר)
+    let d = new Date(currentTs);
+    let target = new Date(d);
+    target.setHours(23, 15, 0, 0);
     
-    let targetAnchor = futureAnchors[0];
-    let diffMs = targetAnchor - currentTs;
-    
-    if (diffMs < 5 * 60 * 1000) {
-        futureAnchors.shift();
-        if (futureAnchors.length === 0) break;
-        targetAnchor = futureAnchors[0];
-        diffMs = targetAnchor - currentTs;
+    // אם כבר עברנו את 23:15 של היום, היעד הוא 23:15 של מחר
+    if (target.getTime() <= currentTs) {
+        target.setDate(target.getDate() + 1);
     }
-
+    
+    let diffMs = target.getTime() - currentTs;
+    
+    // כמה ארוחות אפשר להכניס עד 23:15? מקסימום מרווח של 4 שעות (14,400,000 מ"ש)
     let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
     if (steps === 0) steps = 1;
     
+    // מחלקים את הזמן שנשאר בצורה שווה כדי לנחות בדיוק על היעד
     let interval = diffMs / steps;
     currentTs += interval;
     smartFuture.push(new Date(currentTs));
@@ -330,13 +311,13 @@ function ForecastModal({ events, onClose }) {
   return (
     <div style={S.overlay} onClick={onClose}>
       <div style={{...S.modal, width: '95%', maxWidth: 450, padding: '30px 15px'}} onClick={e=>e.stopPropagation()}>
-        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, margin: '0 0 20px', fontSize: 22}}>תכנון וסנכרון זמנים 🌙</h3>
+        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, margin: '0 0 20px', fontSize: 22}}>תכנון ויישור ללילה 🌙</h3>
         
         <div style={{display: 'flex', gap: 10, marginBottom: 20}}>
           {/* עמודה ימנית (קשיחה) */}
           <div style={{flex: 1, background: '#f8fafc', padding: 10, borderRadius: 15, border: '1px solid #e2e8f0'}}>
             <div style={{fontWeight: 800, fontSize: 13, color: C.textSoft, textAlign: 'center', marginBottom: 15, height: 35}}>
-              מרווח קשיח<br/>(כל 4 שעות בדיוק)
+              מרווח קשיח<br/>(כל 4 שעות)
             </div>
             {dumbFuture.map((t, i) => (
               <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #cbd5e1' : 'none'}}>
@@ -359,8 +340,8 @@ function ForecastModal({ events, onClose }) {
         </div>
 
         <div style={{fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
-          <strong>איך התיקון הירוק עובד?</strong><br/>
-          האלגוריתם מציג לך מקבילה חכמה לכל ארוחה. הוא מותח או מכווץ את הזמנים במידה שווה כדי שהארוחות הבאות יובילו אותך ישר לנחיתה ב-<strong>23:15</strong>, <strong>03:15</strong> ו-<strong>06:45</strong>.
+          <strong>איך העמודה הירוקה מחשבת?</strong><br/>
+          האלגוריתם מסתכל על הזמן שנשאר עד <strong>23:15</strong> ומחלק אותו למרווחים שווים (לעולם לא יותר מ-4 שעות). עקבו אחרי השעות הירוקות, והארוחה האחרונה של היום תנחת בול ביעד!
         </div>
 
         <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
@@ -683,7 +664,7 @@ function AiChatModal({ events, vitaminDone, onClose }) {
           if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
           if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
           if (e.type === "vitaminD") return { ...base, type: "vitaminD" }; 
-          if (e.type === "bath") return { ...base, type: "bath" }; // המודל קורא גם מתי עלמה התקלחה
+          if (e.type === "bath") return { ...base, type: "bath" }; 
           return null;
         }).filter(Boolean)
       };
@@ -789,6 +770,7 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
+  // הלחצנים המרחפים החמודים שלנו
   aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   
