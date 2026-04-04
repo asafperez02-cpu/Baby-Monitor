@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   collection, addDoc, deleteDoc, doc, updateDoc,
-  onSnapshot, query, orderBy
+  onSnapshot, query, orderBy, setDoc
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -11,6 +11,7 @@ const C = {
   peachDark: "#e8845e", blueSoft: "#e0f2fe", creamSoft: "#fff7ed",
   pastelYellow: "#fffdf0", pastelPurple: "#f9f5ff",
   text: "#4a2c2a", textSoft: "#8c6d6a", success: "#34d399", warning: "#fbbf24", danger: "#f87171",
+  purpleDark: "#701a75"
 };
 
 const FONT_MAIN = "'Assistant', sans-serif";
@@ -43,6 +44,11 @@ function getTimeGap(ts1, ts2) {
   const rm = m % 60;
   return rm ? `${h}:${rm.toString().padStart(2, '0')} ש׳` : `${h} ש׳`;
 }
+// הופך כוכביות של AI לטקסט מודגש אמיתי ב-HTML
+function parseAiText(text) {
+  const html = text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, `<strong style="color: ${C.peachDark}; font-weight: 900;">$1</strong>`);
+  return { __html: html };
+}
 
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function BabyApp() {
@@ -74,13 +80,12 @@ export default function BabyApp() {
     setTimeout(() => setShowUndo(false), 5000);
   };
 
-  // בדיקה האם כבר נרשם אירוע ויטמין D היום
   const vitaminDone = events.some(e => e.type === "vitaminD" && isToday(e.ts));
 
   return (
     <div style={S.app}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Varela Round&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800;900&family=Varela Round&display=swap');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; direction: rtl; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
@@ -107,6 +112,7 @@ export default function BabyApp() {
         )}
 
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
+        <ProactiveInsights events={events} vitaminDone={vitaminDone} now={now} />
       </div>
 
       <div style={S.content}>
@@ -124,119 +130,44 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiChatModal events={events} onClose={() => setModal(null)} />}
+      {modal === "handoff" && <HandoffModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
-// ── AI Chat Component (Expert Data Edition) ──────────────────────────────
-function AiChatModal({ events, onClose }) {
-  const [input, setInput] = useState("");
-  const [messages, setMessages] = useState([
-    { role: "ai", text: "היי! אני כאן לעזור. אני מקבלת אלי עכשיו את כל הנתונים של עלמה ברקע. איזה ניתוח נתונים, סיכום, או שאלה תרצה שנעבור עליה?" }
-  ]);
-  const [loading, setLoading] = useState(false);
-  const messagesEndRef = useRef(null);
+// ── Insights Bar (Proactive) ──────────────────────────────────────────────
+function ProactiveInsights({ events, vitaminDone, now }) {
+  const insights = [];
+  
+  const lastPoop = events.find(e => e.type === "diaper" && e.poop);
+  if (lastPoop && (now - lastPoop.ts) > 24 * 60 * 60 * 1000) {
+    insights.push({ icon: "💩", text: "שימו לב: עברו מעל 24 שעות ללא קקי", color: C.danger });
+  }
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
+  const totalMl = todayFeeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+  if (totalMl > 500) insights.push({ icon: "📈", text: `אכלה יפה היום (${totalMl} מ"ל)`, color: C.success });
 
-  const askAi = async () => {
-    if (!input.trim()) return;
-    const newMessages = [...messages, { role: "user", text: input }];
-    setMessages(newMessages);
-    setInput("");
-    setLoading(true);
+  if (new Date(now).getHours() >= 15 && !vitaminDone) {
+    insights.push({ icon: "☀️", text: "אל תשכחו ויטמין D!", color: C.warning });
+  }
 
-    try {
-      const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
-      const recentEvents = events.filter(e => e.ts > twoWeeksAgo).sort((a,b) => a.ts - b.ts);
-      
-      const structuredData = {
-        events: recentEvents.map(e => {
-          const d = new Date(e.ts);
-          const base = { 
-            date: d.toLocaleDateString("he-IL"), 
-            time: d.toLocaleTimeString("he-IL", { hour: '2-digit', minute: '2-digit' }),
-            timestamp_ms: e.ts 
-          };
-          
-          if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
-          if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
-          if (e.type === "vitaminD") return { ...base, type: "vitaminD" }; // הוספנו את יכולת הקריאה של ויטמין D ל-AI
-          return null;
-        }).filter(Boolean)
-      };
-
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, babyData: structuredData }),
-      });
-
-      if (!res.ok) throw new Error("Server error");
-      const data = await res.json();
-
-      setMessages(prev => [...prev, { role: "ai", text: data.answer }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { role: "ai", text: "סליחה, חלה תקלה בעיבוד הנתונים מול השרת." }]);
-    }
-    setLoading(false);
-  };
+  if (insights.length === 0) return null;
 
   return (
-    <div style={S.overlay} onClick={onClose}>
-      <div style={{...S.modal, height: '85vh', maxHeight: '800px', display: 'flex', flexDirection: 'column', padding: '20px', maxWidth: 450, margin: '20px'}} onClick={e=>e.stopPropagation()}>
-        
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 15, borderBottom: `1px solid ${C.border}`, paddingBottom: 15}}>
-          <h3 className="kids-font" style={{color:C.peachDark, margin:0, fontSize: 24}}>האנליסטית של עלמה 📈</h3>
-          <button onClick={onClose} style={{background:'none', border:'none', fontSize:24, color: C.textSoft, cursor: 'pointer', padding: 0}}>✕</button>
+    <div style={{ marginTop: 15, background: 'rgba(255,255,255,0.2)', borderRadius: 15, padding: '10px', display: 'flex', gap: 10, overflowX: 'auto', whiteSpace: 'nowrap' }}>
+      {insights.map((ins, i) => (
+        <div key={i} style={{ background: 'white', padding: '8px 12px', borderRadius: 12, fontSize: 13, fontWeight: 800, color: ins.color, display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
+          <span>{ins.icon}</span> {ins.text}
         </div>
-
-        <div style={{flex:1, overflowY:'auto', background: '#f8fafc', borderRadius: 20, padding: '15px 10px', marginBottom: 15, display:'flex', flexDirection:'column', gap: 12}}>
-          {messages.map((m, i) => (
-            <div key={i} style={{ 
-              alignSelf: m.role === "user" ? "flex-start" : "flex-end", 
-              background: m.role === "user" ? C.peach : "white", 
-              color: m.role === "user" ? "white" : C.text, 
-              padding: "12px 18px", 
-              borderRadius: m.role === "user" ? "20px 20px 5px 20px" : "20px 20px 20px 5px", 
-              maxWidth: "85%", 
-              boxShadow: "0 2px 8px rgba(0,0,0,0.04)", 
-              fontSize: 15,
-              lineHeight: 1.5,
-              direction: "rtl"
-            }}>
-              <div dangerouslySetInnerHTML={{__html: m.text.replace(/\n/g, '<br/>')}} />
-            </div>
-          ))}
-          {loading && (
-            <div style={{ alignSelf: "flex-end", background: "white", padding: "12px 18px", borderRadius: "20px 20px 20px 5px", fontSize: 14, color: C.textSoft }}>
-              מחשבת נתונים...
-            </div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-
-        <div style={{display:'flex', gap: 10}}>
-          <input 
-            placeholder="כתוב הודעה..." 
-            value={input} 
-            onChange={e=>setInput(e.target.value)} 
-            style={{...S.input, marginBottom: 0, padding: '15px', fontSize: 16, borderRadius: 25, border: '1px solid #e2e8f0'}} 
-            onKeyDown={e=>e.key==='Enter'&&askAi()} 
-          />
-          <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, width: 'auto', padding: '0 25px', borderRadius: 25}}>
-            {loading ? "..." : "שלח"}
-          </button>
-        </div>
-      </div>
+      ))}
     </div>
   );
 }
 
-// ── Other Components (Timer, Home, Analytics, Modals) ───────────────
+
+// ── Components ──────────────────────────────────────────────────────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -264,16 +195,86 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
 
       <div style={{display:'flex', justifyContent:'center', marginTop: 20}}>
         <button onClick={onOpenForecast} style={S.forecastBtn}>
-          <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark, marginBottom: 5}}>4 ארוחות הבאות</div>
+          <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark, marginBottom: 5}}>תכנון ארוחות ולילה</div>
           <div style={{fontSize: 24, fontWeight: 900, color: C.text, display: 'flex', alignItems: 'center', gap: 8}}>
             <span>⏰</span> {fmtTime(nextTarget.getTime())}
           </div>
-          <div style={{fontSize: 12, color: C.textSoft, marginTop: 6}}>* מחושב לפי מרווח של 4 שעות</div>
         </button>
       </div>
     </div>
   );
 }
+
+// ── Shift Handoff Modal (תקציר מנהלים) ────────────────────────────────────
+function HandoffModal({ events, vitaminDone, onClose }) {
+  const now = Date.now();
+  const shiftHours = 6;
+  const shiftMs = shiftHours * 60 * 60 * 1000;
+  const shiftEvents = events.filter(e => (now - e.ts) < shiftMs);
+
+  const feeds = shiftEvents.filter(e => e.type === "feed");
+  const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+  const lastFeed = feeds.length > 0 ? feeds[0] : null;
+
+  const diapers = shiftEvents.filter(e => e.type === "diaper");
+  const peeCount = diapers.filter(e => e.pee).length;
+  const poopCount = diapers.filter(e => e.poop).length;
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, maxWidth: 400, padding: 0, overflow: 'hidden'}} onClick={e=>e.stopPropagation()}>
+        <div style={{background: C.peach, padding: '25px 20px', textAlign: 'center', color: 'white'}}>
+          <h3 className="kids-font" style={{margin: 0, fontSize: 26}}>תקציר משמרת 🤝</h3>
+          <p style={{margin: '5px 0 0', opacity: 0.9, fontSize: 14}}>סיכום {shiftHours} השעות האחרונות</p>
+        </div>
+        
+        <div style={{padding: '25px 20px'}}>
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.peachDark, margin: '0 0 10px', fontSize: 18}}>🍼 תזונה</h4>
+            <div style={{background: C.creamSoft, padding: 15, borderRadius: 15}}>
+              {lastFeed ? (
+                <>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
+                    <span style={{fontWeight: 800}}>ארוחה אחרונה:</span>
+                    <span style={{fontWeight: 900, color: C.text}}>{fmtTime(lastFeed.ts)} ({lastFeed.ml} מ"ל)</span>
+                  </div>
+                  <div style={{display:'flex', justifyContent:'space-between'}}>
+                    <span style={{fontWeight: 800}}>סה"כ במשמרת:</span>
+                    <span style={{fontWeight: 900}}>{totalMl} מ"ל ({feeds.length} ארוחות)</span>
+                  </div>
+                </>
+              ) : <div style={{fontWeight: 800}}>לא תועדו האכלות במשמרת זו.</div>}
+            </div>
+          </div>
+
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.purpleDark, margin: '0 0 10px', fontSize: 18}}>🧻 החתלות</h4>
+            <div style={{background: C.pastelPurple, padding: 15, borderRadius: 15}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
+                <span style={{fontWeight: 800}}>פיפי 💧:</span><span style={{fontWeight: 900}}>{peeCount} חיתולים</span>
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between'}}>
+                <span style={{fontWeight: 800}}>קקי 💩:</span><span style={{fontWeight: 900}}>{poopCount} חיתולים</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>💡 תובנות ודגשים להמשך</h4>
+            <ul style={{margin: 0, paddingRight: 20, fontWeight: 700, color: C.textSoft, lineHeight: 1.6}}>
+              {poopCount === 0 && <li style={{color: C.danger}}>לא עשתה קקי במשמרת! כדאי לעקוב בהחתלה הבאה.</li>}
+              {!vitaminDone && <li>טרם קיבלה ויטמין D היום.</li>}
+              {lastFeed && <li><strong style={{color:C.peachDark}}>ארוחה הבאה (משוערת):</strong> סביב השעה {fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.</li>}
+            </ul>
+          </div>
+
+          <button onClick={onClose} style={S.primaryBtn}>סגור והמשך חפיפה</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function HomeView({ events, setModal, onDelete }) {
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
@@ -290,6 +291,11 @@ function HomeView({ events, setModal, onDelete }) {
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
+      
+      <button onClick={() => setModal("handoff")} style={{background: 'white', border: `2px solid ${C.peach}`, borderRadius: 20, padding: 15, fontWeight: 900, color: C.peachDark, fontSize: 18, boxShadow: '0 4px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10}}>
+        🤝 תקציר חפיפה להורה הבא
+      </button>
+
       <div style={{display:'flex', gap:15}}>
         <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5'}}>
           <span style={{fontSize: 34}}>🍼</span> האכלה
@@ -361,6 +367,7 @@ function HomeView({ events, setModal, onDelete }) {
   );
 }
 
+// ── Analytics, Modals & AI Chat (With Markdown Fix) ────────────────────────
 function AnalyticsView({ events }) {
   const daysMap = {};
   events.forEach(e => {
@@ -475,17 +482,53 @@ function DiaperModal({ onConfirm, onClose }) {
   );
 }
 
+// ── Smart Night Forecast Modal ────────────────────────────────────────────
 function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
+  
   const future = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
+  const nextFeed = future[0];
+  
+  // לוגיקת יישור הלילה
+  const nextHour = nextFeed.getHours();
+  let nightAdvice = "";
+  let isNightFocus = false;
+
+  // אם הארוחה הבאה נופלת באזור הערב/תחילת לילה (19:00 - 23:00)
+  if (nextHour >= 19 && nextHour <= 23) {
+    isNightFocus = true;
+    const diffToIdeal = Math.round((new Date(nextFeed).setHours(23, 30, 0) - nextFeed) / 60000);
+    if (Math.abs(diffToIdeal) <= 30) {
+      nightAdvice = "מעולה! אתם מיושרים בול לארוחת לילה ב-23:30 שתמשוך את עלמה יפה עד לארוחה של 03:15.";
+    } else if (diffToIdeal > 30) {
+      nightAdvice = `הארוחה הבאה מוקדמת מדי. נסו "למשוך" את עלמה קצת או לפצל את הארוחה כדי להגיע להאכלה מלאה קרוב יותר ל-23:30.`;
+    } else {
+      nightAdvice = `הארוחה הבאה קצת מאוחרת מ-23:30. כדי לא לפגוע בשגרת ההשכמה ב-06:45, אולי כדאי להקדים מעט את הארוחה הזו.`;
+    }
+  }
+
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>תחזית ארוחות ⏰</h3>
-      <div style={{textAlign:'center', fontSize:13, color:C.textSoft, marginBottom: 15}}>מחושב לפי מרווח של 4 שעות</div>
+      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>תחזית וניהול זמנים ⏰</h3>
+      
+      <div style={{background: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20, border: '1px solid #e2e8f0'}}>
+        <div style={{fontWeight: 900, color: C.text, marginBottom: 10, textAlign: 'center'}}>יישור קו - "שגרת לילה לינאי" 🌙</div>
+        <div style={{fontSize: 13, color: C.textSoft, lineHeight: 1.5, textAlign: 'justify'}}>
+          המטרה: ארוחות ב-<strong>23:30</strong>, <strong>03:15</strong>, והשכמה ב-<strong>06:45</strong> כדי להיות מוכנים לינאי בשבע. 
+        </div>
+        {isNightFocus && (
+          <div style={{marginTop: 10, padding: 10, background: C.creamSoft, borderRadius: 10, fontSize: 13, fontWeight: 800, color: C.peachDark, borderLeft: `4px solid ${C.peach}`}}>
+            {nightAdvice}
+          </div>
+        )}
+      </div>
+
+      <div style={{textAlign:'center', fontSize:13, color:C.textSoft, marginBottom: 10}}>הזמנים לפי מרווח נקי של 4 שעות:</div>
       {future.map((t, i) => (
-        <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'15px 0', borderBottom:'1px dotted #eee'}}>
-          <span style={{fontWeight: 700}}>ארוחה {i+1}:</span><span style={{fontWeight:900, fontSize:19, color:C.peachDark}}>{fmtTime(t.getTime())}</span>
+        <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px dotted #eee', alignItems: 'center'}}>
+          <span style={{fontWeight: 700}}>ארוחה {i+1}:</span>
+          <span style={{fontWeight:900, fontSize:22, color: i===0 ? C.peachDark : C.text}}>{fmtTime(t.getTime())}</span>
         </div>
       ))}
       <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
@@ -493,16 +536,123 @@ function ForecastModal({ events, onClose }) {
   );
 }
 
+function AiChatModal({ events, vitaminDone, onClose }) {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([
+    { role: "ai", text: "היי! אני כאן לעזור. אני מקבלת אלי עכשיו את כל הנתונים של עלמה. איזה ניתוח נתונים, סיכום, או שאלה תרצה שנעבור עליה?" }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const askAi = async () => {
+    if (!input.trim()) return;
+    const newMessages = [...messages, { role: "user", text: input }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const recentEvents = events.filter(e => e.ts > twoWeeksAgo).sort((a,b) => a.ts - b.ts);
+      
+      const structuredData = {
+        vitaminD_given_today: vitaminDone,
+        events: recentEvents.map(e => {
+          const d = new Date(e.ts);
+          const base = { 
+            date: d.toLocaleDateString("he-IL"), 
+            time: d.toLocaleTimeString("he-IL", { hour: '2-digit', minute: '2-digit' }),
+            timestamp_ms: e.ts 
+          };
+          if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
+          if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
+          if (e.type === "vitaminD") return { ...base, type: "vitaminD" }; 
+          return null;
+        }).filter(Boolean)
+      };
+
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, babyData: structuredData }),
+      });
+
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+
+      setMessages(prev => [...prev, { role: "ai", text: data.answer }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: "ai", text: "סליחה, חלה תקלה בעיבוד הנתונים מול השרת." }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, height: '85vh', maxHeight: '800px', display: 'flex', flexDirection: 'column', padding: '20px', maxWidth: 450, margin: '20px'}} onClick={e=>e.stopPropagation()}>
+        
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 15, borderBottom: `1px solid ${C.border}`, paddingBottom: 15}}>
+          <h3 className="kids-font" style={{color:C.peachDark, margin:0, fontSize: 24}}>האנליסטית של עלמה 📈</h3>
+          <button onClick={onClose} style={{background:'none', border:'none', fontSize:24, color: C.textSoft, cursor: 'pointer', padding: 0}}>✕</button>
+        </div>
+
+        <div style={{flex:1, overflowY:'auto', background: '#f8fafc', borderRadius: 20, padding: '15px 10px', marginBottom: 15, display:'flex', flexDirection:'column', gap: 12}}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ 
+              alignSelf: m.role === "user" ? "flex-start" : "flex-end", 
+              background: m.role === "user" ? C.peach : "white", 
+              color: m.role === "user" ? "white" : C.text, 
+              padding: "12px 18px", 
+              borderRadius: m.role === "user" ? "20px 20px 5px 20px" : "20px 20px 20px 5px", 
+              maxWidth: "85%", 
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)", 
+              fontSize: 15,
+              lineHeight: 1.5,
+              direction: "rtl"
+            }}>
+              {/* השימוש בפונקציה שלנו שממירה כוכביות להדגשות */}
+              <div dangerouslySetInnerHTML={parseAiText(m.text)} />
+            </div>
+          ))}
+          {loading && (
+            <div style={{ alignSelf: "flex-end", background: "white", padding: "12px 18px", borderRadius: "20px 20px 20px 5px", fontSize: 14, color: C.textSoft }}>
+              מחשבת נתונים...
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div style={{display:'flex', gap: 10}}>
+          <input 
+            placeholder="כתוב הודעה..." 
+            value={input} 
+            onChange={e=>setInput(e.target.value)} 
+            style={{...S.input, marginBottom: 0, padding: '15px', fontSize: 16, borderRadius: 25, border: '1px solid #e2e8f0'}} 
+            onKeyDown={e=>e.key==='Enter'&&askAi()} 
+          />
+          <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, width: 'auto', padding: '0 25px', borderRadius: 25}}>
+            {loading ? "..." : "שלח"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 30px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 20px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 13, color: "white", fontWeight: 700, opacity: 0.9, marginBottom: 5 },
   babyBadge: { fontSize: 44, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
   vitaminBar: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 20px', borderRadius:'15px', color:'white', fontWeight:800, marginBottom:15, cursor:'pointer', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "35px", padding: "20px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
   progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s ease' },
-  forecastBtn: { background: "white", border: "none", width: "100%", padding: "20px 15px", borderRadius: "22px", boxShadow: "0 8px 20px rgba(0,0,0,0.08)", cursor: "pointer", display:'flex', flexDirection: 'column', alignItems:'center', justifyContent:'center' },
+  forecastBtn: { background: "white", border: "none", width: "100%", padding: "15px", borderRadius: "22px", boxShadow: "0 8px 20px rgba(0,0,0,0.08)", cursor: "pointer", display:'flex', flexDirection: 'column', alignItems:'center', justifyContent:'center' },
   content: { flex: 1, overflowY: "auto", padding: "25px 15px 120px" },
   actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "26px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
   card: { background: "#fffaf7", borderRadius: "32px", padding: "20px", boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
