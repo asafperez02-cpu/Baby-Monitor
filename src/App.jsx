@@ -285,6 +285,7 @@ function SmartLogModal({ onConfirm, onClose }) {
   );
 }
 
+// ── Elegant Task Button Component ─────────────────────────────────────────
 function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   return (
     <button 
@@ -319,7 +320,7 @@ function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   );
 }
 
-// ── Neta Cheeky Compliment Ticker (The Ultimate Roast & Toast Collection) ──
+// ── Neta Cheeky Compliment Ticker ──────────────────────────────────────────
 function NetaTicker({ now }) {
   const [manualOffset, setManualOffset] = useState(0);
 
@@ -540,6 +541,198 @@ function ProactiveTicker({ events, vitaminDone, now }) {
   );
 }
 
+// ── Components ──────────────────────────────────────────────────────────────
+
+function MainTimerWidget({ events, now, onOpenForecast }) {
+  const lastFeed = events.find(e => e.type === "feed");
+  if (!lastFeed) return <div style={S.mainWidget}><div className="kids-font" style={{fontSize: 42, color: 'white'}}>--</div></div>;
+  
+  const diffMin = Math.floor((now - lastFeed.ts) / 60000);
+  const timeStr = diffMin < 60 ? `${diffMin} דק׳` : `${Math.floor(diffMin/60)}:${(diffMin%60).toString().padStart(2,'0')} ש׳`;
+  
+  const targetMins = 240;
+  const progressPercent = Math.min((diffMin / targetMins) * 100, 100);
+  let progColor = C.success;
+  if (diffMin > 150) progColor = C.warning;
+  if (diffMin > 210) progColor = C.danger;
+
+  return (
+    <div style={S.mainWidget}>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div>
+          <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 0}}>אכלה לפני:</div>
+          <div className="kids-font" style={{fontSize: 42, fontWeight: 900, color: 'white', textShadow: '0 2px 10px rgba(0,0,0,0.1)', lineHeight: 1}}>🍼 {timeStr}</div>
+        </div>
+        
+        <button onClick={onOpenForecast} style={{ background: "white", border: "none", width: 55, height: 55, borderRadius: 30, boxShadow: "0 4px 15px rgba(0,0,0,0.1)", cursor: "pointer", display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <BearClockIcon size={34} />
+        </button>
+      </div>
+      
+      <div style={S.progressBarContainer}>
+        <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
+      </div>
+    </div>
+  );
+}
+
+// ── Smart Night Forecast Modal (יעד יחיד: 23:15, 7 ארוחות ביום) ────────────
+function ForecastModal({ events, onClose }) {
+  const lastFeed = events.find(e => e.type === "feed");
+  if (!lastFeed) return null;
+  
+  const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
+  
+  const smartFuture = [];
+  let currentTs = lastFeed.ts;
+
+  let target = new Date(currentTs);
+  target.setHours(23, 15, 0, 0);
+  if (target.getTime() <= currentTs) {
+      target.setDate(target.getDate() + 1);
+  }
+  
+  let diffMs = target.getTime() - currentTs;
+  
+  let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
+  if (steps === 0) steps = 1;
+  
+  let interval = diffMs / steps;
+  
+  let tempTs = currentTs;
+  for (let i = 0; i < 4; i++) {
+    tempTs += interval;
+    smartFuture.push(new Date(tempTs));
+  }
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, width: '95%', maxWidth: 450, padding: '30px 15px'}} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, margin: '0 0 20px', fontSize: 22}}>הטייס האוטומטי 🌙</h3>
+        
+        <div style={{display: 'flex', gap: 10, marginBottom: 20}}>
+          <div style={{flex: 1, background: '#f8fafc', padding: 10, borderRadius: 15, border: '1px solid #e2e8f0'}}>
+            <div style={{fontWeight: 800, fontSize: 13, color: C.textSoft, textAlign: 'center', marginBottom: 15, height: 35}}>
+              מרווח קשיח<br/>(כל 4 שעות)
+            </div>
+            {dumbFuture.map((t, i) => (
+              <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #cbd5e1' : 'none'}}>
+                <span style={{fontWeight:900, fontSize:20, color: C.textSoft}}>{fmtTime(t.getTime())}</span>
+              </div>
+            ))}
+          </div>
+
+          <div style={{flex: 1, background: '#ecfdf5', padding: 10, borderRadius: 15, border: '1px solid #a7f3d0'}}>
+            <div style={{fontWeight: 900, fontSize: 13, color: C.success, textAlign: 'center', marginBottom: 15, height: 35}}>
+              התיקון המומלץ<br/>(יעד סופי: 23:15)
+            </div>
+            {smartFuture.map((t, i) => (
+              <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #a7f3d0' : 'none'}}>
+                <span style={{fontWeight:900, fontSize:20, color: '#059669'}}>{fmtTime(t.getTime())}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
+          <strong>היעד שלכם: נחיתה רכה ב-23:15.</strong><br/>
+          בסיס החישוב הוא 7 ארוחות ביום. המערכת מחשבת את הזמן שנותר עד <strong>23:15</strong> ומחלקת אותו שווה בשווה. עקבו אחרי השעות הירוקות משמאל, והארוחה האחרונה תהיה בדיוק בזמן!
+        </div>
+
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, סגור</button>
+      </div>
+    </div>
+  );
+}
+
+// ── Shift Handoff Modal (משמרת של 4 שעות עם תובנות אקטיביות) ──────────────
+function HandoffModal({ events, vitaminDone, bathDone, onClose }) {
+  const now = Date.now();
+  const shiftHours = 4; // שונה מ-6 ל-4 לבקשתך
+  const shiftMs = shiftHours * 60 * 60 * 1000;
+  const shiftEvents = events.filter(e => (now - e.ts) < shiftMs);
+
+  const feeds = shiftEvents.filter(e => e.type === "feed");
+  const totalMl = feeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
+  const lastFeed = feeds.length > 0 ? feeds[0] : null;
+
+  const diapers = shiftEvents.filter(e => e.type === "diaper");
+  const peeCount = diapers.filter(e => e.pee).length;
+  const poopCount = diapers.filter(e => e.poop).length;
+  
+  const bathDoneShift = shiftEvents.some(e => e.type === "bath");
+
+  let todos = [];
+  if (peeCount === 0) todos.push("לא הוחלף פיפי במשמרת הקודמת - לבדוק חיתול בהקדם.");
+  if (poopCount === 0) todos.push("לא היה קקי ב-4 השעות האחרונות - לשים לב בהחתלות.");
+  if (totalMl < 60) todos.push(`אכלה מעט יחסית (${totalMl} מ"ל) במשמרת - להקפיד על האכלה.`);
+  if (!vitaminDone) todos.push("לא לשכוח לתת ויטמין D (עדיין לא סומן היום).");
+  if (lastFeed) todos.push(`יעד משוער להאכלה הבאה: סביב ${fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.`);
+
+  todos = todos.slice(0, 3);
+  if (todos.length === 0) todos.push("הכל נראה מצוין! משמרת נעימה.");
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, maxWidth: 400, padding: 0, overflow: 'hidden'}} onClick={e=>e.stopPropagation()}>
+        <div style={{background: C.peach, padding: '25px 20px', textAlign: 'center', color: 'white'}}>
+          <h3 className="kids-font" style={{margin: 0, fontSize: 26}}>העברת משמרת 🧸</h3>
+          <p style={{margin: '5px 0 0', opacity: 0.9, fontSize: 14}}>תקציר מנהלים - {shiftHours} שעות אחרונות</p>
+        </div>
+        
+        <div style={{padding: '25px 20px'}}>
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.peachDark, margin: '0 0 10px', fontSize: 18}}>🍼 תזונה</h4>
+            <div style={{background: C.creamSoft, padding: 15, borderRadius: 15}}>
+              {lastFeed ? (
+                <>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
+                    <span style={{fontWeight: 800}}>האכלה אחרונה:</span>
+                    <span style={{fontWeight: 900, color: C.text}}>{fmtTime(lastFeed.ts)} ({lastFeed.ml} מ"ל)</span>
+                  </div>
+                  <div style={{display:'flex', justifyContent:'space-between'}}>
+                    <span style={{fontWeight: 800}}>סה"כ במשמרת:</span>
+                    <span style={{fontWeight: 900}}>{totalMl} מ"ל ({feeds.length} מנות)</span>
+                  </div>
+                </>
+              ) : <div style={{fontWeight: 800}}>לא תועדו האכלות במשמרת זו.</div>}
+            </div>
+          </div>
+
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.purpleDark, margin: '0 0 10px', fontSize: 18}}>🧻 טיפול והחתלה</h4>
+            <div style={{background: C.pastelPurple, padding: 15, borderRadius: 15}}>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
+                <span style={{fontWeight: 800}}>פיפי 💧:</span><span style={{fontWeight: 900}}>{peeCount} חיתולים</span>
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between', marginBottom: bathDoneShift ? 5 : 0}}>
+                <span style={{fontWeight: 800}}>קקי 💩:</span><span style={{fontWeight: 900}}>{poopCount} חיתולים</span>
+              </div>
+              {bathDoneShift && (
+                <div style={{display:'flex', justifyContent:'space-between', borderTop: '1px dotted #cbd5e1', paddingTop: 5, marginTop: 5}}>
+                  <span style={{fontWeight: 800}}>מקלחת 🛁:</span><span style={{fontWeight: 900, color: C.success}}>עשתה היום!</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{marginBottom: 20}}>
+            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>🎯 לוודא במשמרת:</h4>
+            <ul style={{margin: 0, paddingRight: 20, fontWeight: 700, color: C.textSoft, lineHeight: 1.6}}>
+              {todos.map((todo, idx) => (
+                <li key={idx} style={{marginBottom: 4}}>{todo}</li>
+              ))}
+            </ul>
+          </div>
+
+          <button onClick={onClose} style={S.primaryBtn}>סגור והמשך חפיפה</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Views ───────────────────────────────────────────────────────────────
 function HomeView({ events, setModal, onDelete }) {
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
   const todayDiapers = events.filter(e => e.type === "diaper" && isToday(e.ts));
@@ -553,7 +746,6 @@ function HomeView({ events, setModal, onDelete }) {
   const displayFeeds = events.filter(e => e.type === "feed").sort((a,b)=>b.ts-a.ts).slice(0, 15);
   const displayDiapers = events.filter(e => e.type === "diaper").sort((a,b)=>b.ts-a.ts).slice(0, 15);
 
-  // חישוב ממוצע זמני האכלה להיום
   const sortedTodayFeeds = [...todayFeeds].sort((a,b) => a.ts - b.ts);
   let avgGapStr = null;
   if (sortedTodayFeeds.length > 1) {
@@ -739,7 +931,7 @@ function FeedModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, marginBottom: 15}}>האכלה 🍼</h3>
       
-      <div style={{textAlign: 'center', color: '#cbd5e1', marginBottom: 10, fontSize: 14}}>בחירה מהירה (לא שומר אוטומטית):</div>
+      <div style={{textAlign: 'center', color: '#cbd5e1', marginBottom: 10, fontSize: 14}}>בחירה מהירה:</div>
       <div style={{display:'flex', gap:10, marginBottom:20}}>
         <button onClick={()=>setMl("60")} style={S.chip(ml==="60")}>60 מ"ל</button>
         <button onClick={()=>setMl("90")} style={S.chip(ml==="90")}>90 מ"ל</button>
