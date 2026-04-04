@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   collection, addDoc, deleteDoc, doc, updateDoc,
   onSnapshot, query, orderBy, setDoc
@@ -83,7 +83,7 @@ export default function BabyApp() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Varela Round&display=swap');
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
-        body { margin: 0; background: ${C.bg}; overflow: hidden; }
+        body { margin: 0; background: ${C.bg}; overflow: hidden; direction: rtl; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
       `}</style>
 
@@ -125,12 +125,120 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiModal events={events} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
-// ── Components ──────────────────────────────────────────────────────────────
+// ── AI Chat Component (Expert Data Edition) ──────────────────────────────
+function AiChatModal({ events, vitaminDone, onClose }) {
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState([
+    { role: "ai", text: "היי! אני כאן לעזור. אני מקבלת אלי עכשיו את כל הנתונים של עלמה ברקע. איזה ניתוח נתונים, סיכום, או שאלה תרצה שנעבור עליה?" }
+  ]);
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const askAi = async () => {
+    if (!input.trim()) return;
+    const newMessages = [...messages, { role: "user", text: input }];
+    setMessages(newMessages);
+    setInput("");
+    setLoading(true);
+
+    try {
+      // אוספים נתונים של שבועיים אחורה במבנה JSON מסודר לטובת ניתוח מתקדם
+      const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
+      const recentEvents = events.filter(e => e.ts > twoWeeksAgo).sort((a,b) => a.ts - b.ts);
+      
+      const structuredData = {
+        vitaminD_given_today: vitaminDone,
+        events: recentEvents.map(e => {
+          const d = new Date(e.ts);
+          const base = { 
+            date: d.toLocaleDateString("he-IL"), 
+            time: d.toLocaleTimeString("he-IL", { hour: '2-digit', minute: '2-digit' }),
+            timestamp_ms: e.ts 
+          };
+          
+          if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
+          if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
+          return null;
+        }).filter(Boolean)
+      };
+
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: newMessages, babyData: structuredData }),
+      });
+
+      if (!res.ok) throw new Error("Server error");
+      const data = await res.json();
+
+      setMessages(prev => [...prev, { role: "ai", text: data.answer }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: "ai", text: "סליחה, חלה תקלה בעיבוד הנתונים מול השרת." }]);
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, height: '85vh', maxHeight: '800px', display: 'flex', flexDirection: 'column', padding: '20px', maxWidth: 450, margin: '20px'}} onClick={e=>e.stopPropagation()}>
+        
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: 15, borderBottom: `1px solid ${C.border}`, paddingBottom: 15}}>
+          <h3 className="kids-font" style={{color:C.peachDark, margin:0, fontSize: 24}}>האנליסטית של עלמה 📈</h3>
+          <button onClick={onClose} style={{background:'none', border:'none', fontSize:24, color: C.textSoft, cursor: 'pointer', padding: 0}}>✕</button>
+        </div>
+
+        <div style={{flex:1, overflowY:'auto', background: '#f8fafc', borderRadius: 20, padding: '15px 10px', marginBottom: 15, display:'flex', flexDirection:'column', gap: 12}}>
+          {messages.map((m, i) => (
+            <div key={i} style={{ 
+              alignSelf: m.role === "user" ? "flex-start" : "flex-end", 
+              background: m.role === "user" ? C.peach : "white", 
+              color: m.role === "user" ? "white" : C.text, 
+              padding: "12px 18px", 
+              borderRadius: m.role === "user" ? "20px 20px 5px 20px" : "20px 20px 20px 5px", 
+              maxWidth: "85%", 
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)", 
+              fontSize: 15,
+              lineHeight: 1.5,
+              direction: "rtl"
+            }}>
+              <div dangerouslySetInnerHTML={{__html: m.text.replace(/\n/g, '<br/>')}} />
+            </div>
+          ))}
+          {loading && (
+            <div style={{ alignSelf: "flex-end", background: "white", padding: "12px 18px", borderRadius: "20px 20px 20px 5px", fontSize: 14, color: C.textSoft }}>
+              מחשבת נתונים...
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+
+        <div style={{display:'flex', gap: 10}}>
+          <input 
+            placeholder="כתוב הודעה..." 
+            value={input} 
+            onChange={e=>setInput(e.target.value)} 
+            style={{...S.input, marginBottom: 0, padding: '15px', fontSize: 16, borderRadius: 25, border: '1px solid #e2e8f0'}} 
+            onKeyDown={e=>e.key==='Enter'&&askAi()} 
+          />
+          <button onClick={askAi} disabled={loading} style={{...S.primaryBtn, width: 'auto', padding: '0 25px', borderRadius: 25}}>
+            {loading ? "..." : "שלח"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Other Components (Timer, Home, Analytics, Modals) ───────────────
 
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
@@ -166,51 +274,6 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
         </button>
       </div>
     </div>
-  );
-}
-
-// ── AI Component ───────────────────────────────────────────────────────────
-function AiModal({ events, onClose }) {
-  const [q, setQ] = useState("");
-  const [ans, setAns] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const askAi = async () => {
-    if (!q.trim()) return;
-    setLoading(true);
-    setAns("מנתחת נתונים... 🌸");
-
-    try {
-      const history = events
-        .slice(0, 15)
-        .map(e => `${fmtTime(e.ts)}: ${e.type === "feed" ? `אכלה ${e.ml}ml` : "חיתול"}`)
-        .join(", ");
-
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, history }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
-      const data = await res.json();
-      setAns(data.answer || "לא התקבלה תשובה.");
-    } catch (err) {
-      setAns("סליחה, תקלה בניתוח הנתונים.");
-    }
-
-    setLoading(false);
-  };
-
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>העוזרת של עלמה ✨</h3>
-      <input placeholder="כמה עלמה אכלה היום?" value={q} onChange={e=>setQ(e.target.value)} style={S.input} onKeyDown={e=>e.key==='Enter'&&askAi()} />
-      <button onClick={askAi} disabled={loading} style={S.primaryBtn}>{loading ? "מחשבת..." : "שאל אותי"}</button>
-      {ans && <div style={S.aiResponse}>{ans}</div>}
-      <button onClick={onClose} style={{...S.primaryBtn, background: C.textSoft, marginTop: 10}}>סגור</button>
-    </div></div>
   );
 }
 
@@ -466,13 +529,12 @@ const S = {
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
   aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
-  aiResponse: { marginTop: 15, padding: "15px", background: C.creamSoft, borderRadius: "15px", fontSize: 15, fontWeight: 700, color: C.text, border: `1px solid ${C.border}` },
   
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
-  modal: { background: "white", padding: "35px", borderRadius: "40px", width: "92%", maxWidth: 380 },
+  modal: { background: "white", padding: "35px", borderRadius: "40px", width: "100%" },
   chip: (active) => ({ flex: 1, padding: "14px", borderRadius: "15px", border: active ? `2px solid ${C.peach}` : "1px solid #f1f5f9", background: active ? C.creamSoft : "#f8fafc", fontWeight: 800, color: active ? C.peachDark : C.textSoft }),
-  input: { width: "100%", padding: "18px", borderRadius: "18px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 22, fontWeight: 700 },
-  primaryBtn: { width: "100%", padding: "20px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 19 },
+  input: { width: "100%", padding: "18px", borderRadius: "18px", border: `2px solid #f1f5f9`, marginBottom: 20, textAlign: "center", fontSize: 22, fontWeight: 700, fontFamily: FONT_MAIN },
+  primaryBtn: { width: "100%", padding: "20px", borderRadius: "22px", background: C.peach, color: "white", border: "none", fontWeight: 800, fontSize: 19, fontFamily: FONT_MAIN },
   summaryRow: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 0', borderBottom:'1px solid #f9fafb' },
   undoToast: { position: 'fixed', bottom: 120, left: 20, right: 20, background: '#333', color: 'white', padding: '15px 25px', borderRadius: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 9999 }
 };
