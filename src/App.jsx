@@ -77,12 +77,16 @@ export default function BabyApp() {
 
   const addEvent = async (ev) => {
     if ("vibrate" in navigator) navigator.vibrate(40);
-    let finalTs = Date.now();
-    if (ev.manualTime) {
+    // שימוש בזמן ייעודי מהעוזרת החכמה, או זמן נוכחי/ידני
+    let finalTs = ev.ts_override || Date.now(); 
+    delete ev.ts_override; // ניקוי השדה לפני שמירה למסד
+
+    if (ev.manualTime && !ev.ts_override) {
       const [h, m] = ev.manualTime.split(':');
       const d = new Date(); d.setHours(parseInt(h), parseInt(m), 0, 0);
       finalTs = d.getTime();
     }
+
     const docRef = await addDoc(collection(db, "events"), { ts: finalTs, user: userName, ...ev });
     setUndoId(docRef.id); setShowUndo(true);
     setTimeout(() => setShowUndo(false), 5000);
@@ -171,6 +175,114 @@ export default function BabyApp() {
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
       {modal === "handoff" && <HandoffModal events={events} vitaminDone={vitaminDone} bathDone={bathDone} onClose={() => setModal(null)} />}
       {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} bathDone={bathDone} onClose={() => setModal(null)} />}
+      {modal === "smartLog" && <SmartLogModal onConfirm={addEvent} onClose={() => setModal(null)} />}
+    </div>
+  );
+}
+
+// ── Smart Log Modal (הזנה קולית / הקלדה חופשית) ───────────────────────────
+function SmartLogModal({ onConfirm, onClose }) {
+  const [text, setText] = useState("");
+  const [listening, setListening] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setErrorMsg("זיהוי קולי לא נתמך בדפדפן שלך. אנא הקלד את הפעולה במקום.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'he-IL';
+    recognition.interimResults = false;
+    
+    recognition.onstart = () => { setListening(true); setErrorMsg(""); setText(""); };
+    recognition.onresult = (e) => setText(e.results[0][0].transcript);
+    recognition.onerror = () => { setListening(false); setErrorMsg("לא הצלחתי לשמוע. נסה שוב."); };
+    recognition.onend = () => setListening(false);
+    
+    recognition.start();
+  };
+
+  const processSmartText = async () => {
+    if (!text.trim()) return;
+    setLoading(true);
+    setErrorMsg("");
+    
+    try {
+      const res = await fetch("/api/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          mode: "parse_voice", 
+          text: text,
+          currentTime: new Date().toLocaleTimeString("he-IL", { hour: '2-digit', minute: '2-digit' })
+        })
+      });
+      
+      const data = await res.json();
+      
+      if (!data.type || data.type === "unknown") {
+        setErrorMsg("לא הצלחתי להבין איזו פעולה עשית. נסה לנסח אחרת.");
+        setLoading(false);
+        return;
+      }
+
+      // הרכבת האירוע למסד הנתונים
+      const exactTs = Date.now() - ((data.minutesAgo || 0) * 60000);
+      const eventToSave = { type: data.type, ts_override: exactTs };
+      
+      if (data.type === "feed") eventToSave.ml = data.ml;
+      if (data.type === "diaper") {
+        eventToSave.pee = data.pee !== undefined ? data.pee : true; 
+        eventToSave.poop = data.poop || false;
+      }
+      
+      onConfirm(eventToSave);
+      onClose();
+    } catch (e) {
+      setErrorMsg("שגיאת תקשורת בפענוח הנתונים.");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, textAlign: 'center'}} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{color: C.peachDark, margin: '0 0 20px', fontSize: 24}}>הזנה חכמה 🎙️</h3>
+        <p style={{fontSize: 14, color: C.textSoft, marginBottom: 20}}>
+          לחץ על המיקרופון ודבר, או פשוט הקלד. <br/>למשל: "עלמה אכלה 60 מיל ב-10 בבוקר" או "החלפנו לה קקי לפני רבע שעה".
+        </p>
+
+        <div style={{display: 'flex', justifyContent: 'center', marginBottom: 20}}>
+          <button 
+            onClick={startListening} 
+            style={{
+              width: 80, height: 80, borderRadius: 40, border: 'none',
+              background: listening ? C.danger : C.peach, color: 'white',
+              fontSize: 32, cursor: 'pointer',
+              boxShadow: listening ? `0 0 20px ${C.danger}` : `0 8px 20px rgba(0,0,0,0.15)`,
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {listening ? "..." : "🎤"}
+          </button>
+        </div>
+
+        <textarea 
+          placeholder="או הקלד כאן חופשי..." 
+          value={text} 
+          onChange={e=>setText(e.target.value)} 
+          style={{...S.input, height: 100, borderRadius: 15, padding: 15, fontSize: 18, resize: 'none'}} 
+        />
+        
+        {errorMsg && <div style={{color: C.danger, fontWeight: 800, marginBottom: 15}}>{errorMsg}</div>}
+        
+        <button onClick={processSmartText} disabled={loading} style={S.primaryBtn}>
+          {loading ? "מפענח..." : "שמור אירוע"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -471,11 +583,14 @@ function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
   
+  // טור ימין: מרווח קשיח של בדיוק 4 שעות רגיל
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
+  // טור שמאל: אלגוריתם חכם - יעד סופי ומוחלט הוא 23:15.
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
+  // חישוב היעד: 23:15 הבא
   let target = new Date(currentTs);
   target.setHours(23, 15, 0, 0);
   if (target.getTime() <= currentTs) {
@@ -631,12 +746,15 @@ function HomeView({ events, setModal, onDelete }) {
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
 
-      <div style={{display:'flex', gap:15}}>
+      <div style={{display:'flex', gap:10}}>
         <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5'}}>
           <span style={{fontSize: 34}}>🍼</span> האכלה
         </button>
         <button onClick={() => setModal("diaper")} style={{...S.actionBtn, background:'#fdf4ff', color:'#701a75', border:'1px solid #e9d5ff'}}>
           <DiaperIcon size={34} /> החתלה
+        </button>
+        <button onClick={() => setModal("smartLog")} style={{...S.actionBtn, background:'#ecfdf5', color:'#064e3b', border:'1px solid #a7f3d0'}}>
+          <span style={{fontSize: 34}}>🎤</span> חכם
         </button>
       </div>
 
@@ -656,8 +774,7 @@ function HomeView({ events, setModal, onDelete }) {
           </div>
         </div>
         
-        {/* העמודות המסודרות והמלבניות החדשות */}
-        <div style={{display:'flex', gap:15, marginTop: 20}}>
+        <div style={{display:'flex', gap:10, marginTop: 20}}>
           <div style={S.column(C.pastelYellow)}>
             <div style={S.columnHeader}><span style={{fontSize: 24}}>🍼</span></div>
             {displayFeeds.map((e, i) => (
@@ -795,13 +912,26 @@ function FeedModal({ onConfirm, onClose }) {
   return (
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, marginBottom: 15}}>האכלה 🍼</h3>
+      
+      {/* כפתור הטורבו החדש */}
+      <div style={{marginBottom: 20}}>
+        <button 
+          onClick={()=>{onConfirm({type:'feed', ml:60, manualTime: null}); onClose();}} 
+          style={{...S.primaryBtn, background: C.success, padding: '15px'}}
+        >
+          ⚡ מנת 60 מ"ל עכשיו!
+        </button>
+      </div>
+
+      <div style={{textAlign: 'center', color: '#cbd5e1', marginBottom: 15, fontSize: 14}}>או הקלדה ידנית:</div>
+
       <div style={{display:'flex', gap:10, marginBottom:20}}>
         <button onClick={()=>setTimeMode("now")} style={S.chip(timeMode==="now")}>עכשיו</button>
         <button onClick={()=>setTimeMode("manual")} style={S.chip(timeMode==="manual")}>זמן אחר</button>
       </div>
       {timeMode === "manual" && <input type="time" value={manualTime} onChange={e=>setManualTime(e.target.value)} style={S.input} />}
       <input type="number" placeholder='כמות מ"ל' value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
-      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime: timeMode==='manual'?manualTime:null}); onClose();}} style={S.primaryBtn}>שמור</button>
+      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime: timeMode==='manual'?manualTime:null}); onClose();}} style={S.primaryBtn}>שמור מנה</button>
     </div></div>
   );
 }
@@ -872,7 +1002,7 @@ function AiChatModal({ events, vitaminDone, bathDone, onClose }) {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: newMessages, babyData: structuredData }),
+        body: JSON.stringify({ messages: newMessages, babyData: structuredData })
       });
 
       if (!res.ok) throw new Error("Server error");
@@ -946,8 +1076,10 @@ const S = {
   mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "30px", padding: "15px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
   progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '10px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s ease' },
-  content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" },
-  actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "26px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
+  
+  content: { flex: 1, overflowY: "auto", padding: "20px 15px 180px", zIndex: 1 },
+  
+  actionBtn: { flex: 1, padding: "15px 10px", borderRadius: "26px", fontSize: 18, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
   card: { background: "#fffaf7", borderRadius: "32px", padding: "20px", boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
   cardTitle: { fontSize: 21, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
   
@@ -958,30 +1090,27 @@ const S = {
   summaryMainValue: { fontSize: 20, fontWeight: 900, color: C.text },
   summarySubValue: { fontSize: 13, fontWeight: 800, color: C.peachDark, marginTop: 2 },
 
-  // עמודות חדשות - עיצוב מלבני ומסודר
   column: (bgColor) => ({ flex: 1, display: "flex", flexDirection: "column", background: bgColor, padding: "10px", borderRadius: "16px", border: "1px solid rgba(0,0,0,0.05)" }),
   columnHeader: { textAlign: "center", marginBottom: 15, paddingTop: 5 },
   
-  // מבנה כרטיסייה חדש
   eventMiniCard: { display: "flex", flexDirection: "column", padding: "12px", borderRadius: "12px", background: C.white, boxShadow: '0 2px 6px rgba(0,0,0,0.04)', width: '100%', position: 'relative', zIndex: 2 },
   eventTimeRow: { display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 8 },
   eventTimeText: { fontWeight: 800, fontSize: 13, color: C.textSoft },
   
-  // שדה המ"ל (ערוך) ואייקוני החתלה (בשורה)
   mlEditInput: { width: '100%', border: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: 8, textAlign: 'center', fontWeight: 900, fontSize: 16, padding: '8px 0', color: C.text },
   diaperIconsRow: { display: 'flex', justifyContent: 'center', gap: 8, fontSize: 20, padding: '4px 0' },
   
-  // השרשרת החדשה (קו אנכי מקווקו במרכז)
   chainContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', height: '40px', justifyContent: 'center', position: 'relative' },
   chainLine: { position: 'absolute', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)', borderLeft: `2px dashed ${C.peach}`, opacity: 0.5, zIndex: 1 },
   chainText: (bgColor) => ({ background: bgColor, padding: '2px 8px', borderRadius: '10px', fontSize: 11, fontWeight: 800, color: C.textSoft, zIndex: 2 }),
 
   delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer', padding: 0 },
-  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
+  
+  nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.05)', zIndex: 1000 },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
-  handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
+  aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 1001, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
+  handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 1001, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "100%" },
