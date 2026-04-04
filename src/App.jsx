@@ -210,8 +210,7 @@ function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   );
 }
 
-
-// ── Neta Cheeky Compliment Ticker (150 Masterpieces - Fixed Quotes) ────────
+// ── Neta Cheeky Compliment Ticker ──────────────────────────────────────────
 function NetaTicker({ now }) {
   const [manualOffset, setManualOffset] = useState(0);
 
@@ -251,7 +250,7 @@ function NetaTicker({ now }) {
     "נטע, כמות החן והסטייל שלך פשוט לא חוקית בעליל.",
     "נטע, את ההוכחה המדעית לכך שקסמים קיימים.",
     "נטע, מי צריכה שעות שינה כשאת נראית ככה טבעי?",
-    "נטע, תזכורת: הכלים בכיור יכולים לחכות. השנ״צ שלך לא.", // תוקן לגרשיים עבריים
+    "נטע, תזכורת: הכלים בכיור יכולים לחכות. השנ״צ שלך לא.",
     "נטע, את התיבול הכי שווה בחיים של אסף (יותר מהראב של הבשר).",
     "נטע, אפילו כשהקפה שלך התקרר ממזמן, את עדיין רותחת.",
     "נטע, את הכוח המניע של הרכבת הזו. בלי יחסי ציבור, פשוט עובדות.",
@@ -325,7 +324,7 @@ function NetaTicker({ now }) {
     "נטע, אני רואה את זמני ההאכלות. אין דברים כמוך בעולם המסירות.",
     "נטע, נראה לי שחסרים לך איזה 80 אחוזי סוללה בגוף. לכי לישון!",
     "נטע, החיים שלך הם כמו סדרה בנטפליקס, ואת הכוכבת הראשית.",
-    "נטע, אסף חשב שהוא מביא לי הוראות. אני מקשיב רק לך. מה הלו״ז?", // תוקן לגרשיים עבריים
+    "נטע, אסף חשב שהוא מביא לי הוראות. אני מקשיב רק לך. מה הלו״ז?",
     "נטע, השלווה שלך (גם אם היא מזויפת כרגע) פשוט מעוררת השראה.",
     "נטע, בואי נסגור שעכשיו התור של אסף. לכי לראות טלוויזיה.",
     "נטע, תסתכלי על שני הילדים המדהימים האלה. את יצרת את זה. בום.",
@@ -472,14 +471,11 @@ function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
   
-  // טור ימין: מרווח קשיח של בדיוק 4 שעות רגיל
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
-  // טור שמאל: אלגוריתם חכם - יעד סופי ומוחלט הוא 23:15.
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
-  // חישוב היעד: 23:15 הבא
   let target = new Date(currentTs);
   target.setHours(23, 15, 0, 0);
   if (target.getTime() <= currentTs) {
@@ -532,7 +528,7 @@ function ForecastModal({ events, onClose }) {
 
         <div style={{fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
           <strong>היעד שלכם: נחיתה רכה ב-23:15.</strong><br/>
-          בסיס החישוב הוא שעלמה אוכלת 7 ארוחות ביום. המערכת מחשבת את הזמן שנותר עד ליעד הלילה <strong>(23:15)</strong> ומחלקת אותו שווה בשווה. עקבו אחרי השעות הירוקות משמאל, והארוחה האחרונה תהיה בדיוק בזמן!
+          בסיס החישוב הוא 7 ארוחות ביום. המערכת מחשבת את הזמן שנותר עד <strong>23:15</strong> ומחלקת אותו שווה בשווה. עקבו אחרי השעות הירוקות משמאל, והארוחה האחרונה תהיה בדיוק בזמן!
         </div>
 
         <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, סגור</button>
@@ -660,24 +656,30 @@ function HomeView({ events, setModal, onDelete }) {
           </div>
         </div>
         
-        <div style={{display:'flex', gap:10, marginTop: 20}}>
+        {/* העמודות המסודרות והמלבניות החדשות */}
+        <div style={{display:'flex', gap:15, marginTop: 20}}>
           <div style={S.column(C.pastelYellow)}>
             <div style={S.columnHeader}><span style={{fontSize: 24}}>🍼</span></div>
             {displayFeeds.map((e, i) => (
-              <div key={e.id}>
-                <div style={S.eventMiniCard(C.white)}>
-                  <div style={{display:'flex', justifyContent:'space-between', width:'100%', alignItems:'center', marginBottom: 4}}>
-                    <span style={{fontWeight: 800, fontSize: 12, color: C.textSoft}}>{formatEventTime(e.ts)}</span>
+              <div key={e.id} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <div style={S.eventMiniCard}>
+                  <div style={S.eventTimeRow}>
+                    <span style={S.eventTimeText}>{formatEventTime(e.ts)}</span>
                     <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
                   </div>
                   <input 
                     style={S.mlEditInput} 
                     value={e.ml || ""} 
-                    placeholder="מ״ל" 
+                    placeholder='מ"ל' 
                     onChange={(el) => updateDoc(doc(db,"events",e.id), {ml: el.target.value})} 
                   />
                 </div>
-                {displayFeeds[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, displayFeeds[i+1].ts)}</div></div>}
+                {displayFeeds[i+1] && (
+                  <div style={S.chainContainer}>
+                    <div style={S.chainLine}></div>
+                    <div style={S.chainText(C.pastelYellow)}>{getTimeGap(e.ts, displayFeeds[i+1].ts)}</div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -685,18 +687,24 @@ function HomeView({ events, setModal, onDelete }) {
           <div style={S.column(C.pastelPurple)}>
             <div style={S.columnHeader}><DiaperIcon size={28} /></div>
             {displayDiapers.map((e, i) => (
-              <div key={e.id}>
-                <div style={S.eventMiniCard(C.white)}>
-                  <div style={{display:'flex', justifyContent:'space-between', width:'100%', alignItems:'center', marginBottom: 4}}>
-                    <span style={{fontWeight: 800, fontSize: 12, color: C.textSoft}}>{formatEventTime(e.ts)}</span>
+              <div key={e.id} style={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                <div style={S.eventMiniCard}>
+                  <div style={S.eventTimeRow}>
+                    <span style={S.eventTimeText}>{formatEventTime(e.ts)}</span>
                     <button onClick={()=>onDelete(e.id)} style={S.delBtn}>✕</button>
                   </div>
-                  <div style={{fontSize: 18, marginTop: 4}}>
-                    {e.pee?"💧":""}{e.poop?"💩":""}
+                  <div style={S.diaperIconsRow}>
+                    {e.pee && <span title="פיפי">💧</span>}
+                    {e.poop && <span title="קקי">💩</span>}
                     {(!e.pee && !e.poop) && <DiaperIcon size={18} color="#cbd5e1"/>}
                   </div>
                 </div>
-                {displayDiapers[i+1] && <div style={S.chainContainer}><div style={S.chainCurve}></div><div style={S.chainText}>{getTimeGap(e.ts, displayDiapers[i+1].ts)}</div></div>}
+                {displayDiapers[i+1] && (
+                  <div style={S.chainContainer}>
+                    <div style={S.chainLine}></div>
+                    <div style={S.chainText(C.pastelPurple)}>{getTimeGap(e.ts, displayDiapers[i+1].ts)}</div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -931,7 +939,6 @@ function AiChatModal({ events, vitaminDone, bathDone, onClose }) {
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
   
-  // Header מכווץ
   headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "20px 15px 15px", borderRadius: "0 0 35px 35px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
   greeting: { fontSize: 14, color: "white", fontWeight: 700, opacity: 0.9 },
   babyBadge: { fontSize: 32, color: "white", fontWeight: 800, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
@@ -951,14 +958,25 @@ const S = {
   summaryMainValue: { fontSize: 20, fontWeight: 900, color: C.text },
   summarySubValue: { fontSize: 13, fontWeight: 800, color: C.peachDark, marginTop: 2 },
 
-  column: (bgColor) => ({ flex: 1, display: "flex", flexDirection: "column", background: bgColor, padding: "8px", borderRadius: "24px", border: "1px solid #f1f5f9" }),
+  // עמודות חדשות - עיצוב מלבני ומסודר
+  column: (bgColor) => ({ flex: 1, display: "flex", flexDirection: "column", background: bgColor, padding: "10px", borderRadius: "16px", border: "1px solid rgba(0,0,0,0.05)" }),
   columnHeader: { textAlign: "center", marginBottom: 15, paddingTop: 5 },
-  eventMiniCard: (bgColor) => ({ display: "flex", flexDirection: "column", alignItems: "center", padding: "10px 12px", borderRadius: "18px", background: bgColor, boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }),
-  mlEditInput: { width: '65px', border:'none', background:'rgba(0,0,0,0.04)', borderRadius:8, textAlign:'center', fontWeight:900, fontSize:15, padding:6, color: C.text },
-  chainContainer: { display: 'flex', alignItems: 'center', height: '25px', marginRight: '20px' },
-  chainCurve: { width: '15px', height: '100%', border: `2px dashed ${C.peach}`, borderLeft: 'none', borderRadius: '0 15px 15px 0', opacity: 0.5 },
-  chainText: { fontSize: 11, fontWeight: 800, color: C.textSoft, marginRight: 8 },
-  delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer' },
+  
+  // מבנה כרטיסייה חדש
+  eventMiniCard: { display: "flex", flexDirection: "column", padding: "12px", borderRadius: "12px", background: C.white, boxShadow: '0 2px 6px rgba(0,0,0,0.04)', width: '100%', position: 'relative', zIndex: 2 },
+  eventTimeRow: { display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 8 },
+  eventTimeText: { fontWeight: 800, fontSize: 13, color: C.textSoft },
+  
+  // שדה המ"ל (ערוך) ואייקוני החתלה (בשורה)
+  mlEditInput: { width: '100%', border: '1px solid #f1f5f9', background: '#f8fafc', borderRadius: 8, textAlign: 'center', fontWeight: 900, fontSize: 16, padding: '8px 0', color: C.text },
+  diaperIconsRow: { display: 'flex', justifyContent: 'center', gap: 8, fontSize: 20, padding: '4px 0' },
+  
+  // השרשרת החדשה (קו אנכי מקווקו במרכז)
+  chainContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', height: '40px', justifyContent: 'center', position: 'relative' },
+  chainLine: { position: 'absolute', top: 0, bottom: 0, left: '50%', transform: 'translateX(-50%)', borderLeft: `2px dashed ${C.peach}`, opacity: 0.5, zIndex: 1 },
+  chainText: (bgColor) => ({ background: bgColor, padding: '2px 8px', borderRadius: '10px', fontSize: 11, fontWeight: 800, color: C.textSoft, zIndex: 2 }),
+
+  delBtn: { background:'none', border:'none', color: '#cbd5e1', fontSize: 14, cursor: 'pointer', padding: 0 },
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
