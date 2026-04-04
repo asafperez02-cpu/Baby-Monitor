@@ -91,6 +91,12 @@ export default function BabyApp() {
   const vitaminDone = events.some(e => e.type === "vitaminD" && isToday(e.ts));
   const bathDone = events.some(e => e.type === "bath" && isToday(e.ts));
 
+  // חישוב צבע הויטמין לפי השעה
+  const currentHour = new Date(now).getHours();
+  let vitColor = '#bbf7d0'; // ירוק פסטל לבוקר
+  if (currentHour >= 12 && currentHour < 18) vitColor = '#fef08a'; // צהוב-כתום לצהריים
+  if (currentHour >= 18) vitColor = '#fecaca'; // אדום פסטל לערב
+
   return (
     <div style={S.app}>
       <style>{`
@@ -116,7 +122,7 @@ export default function BabyApp() {
         </div>
       )}
 
-      {/* Header */}
+      {/* Header - Compact Version */}
       <div style={S.headerContainer}>
         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 8, marginBottom: 10}}>
           <div style={S.greeting}>שלום {userName} 👋</div>
@@ -125,10 +131,24 @@ export default function BabyApp() {
         
         <NetaTicker now={now} />
 
-        {/* Task Buttons */}
+        {/* Task Buttons - Elegant Pastel with Checkboxes */}
         <div style={{display: 'flex', gap: 10, marginBottom: 12}}>
-          <TaskButton icon="☀️" text="ויטמין D" done={vitaminDone} onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })} />
-          <TaskButton icon="🛁" text="מקלחת" done={bathDone} onClick={() => !bathDone && addEvent({ type: "bath" })} />
+          <TaskButton 
+            icon="☀️" 
+            text="ויטמין D" 
+            done={vitaminDone} 
+            bgColor={vitColor}
+            textColor="#064e3b"
+            onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })} 
+          />
+          <TaskButton 
+            icon="🛁" 
+            text="מקלחת" 
+            done={bathDone} 
+            bgColor="#e0f2fe" 
+            textColor="#075985"
+            onClick={() => !bathDone && addEvent({ type: "bath" })} 
+          />
         </div>
 
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
@@ -151,192 +171,85 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
-      {modal === "handoff" && <HandoffModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
+      {modal === "handoff" && <HandoffModal events={events} vitaminDone={vitaminDone} bathDone={bathDone} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} bathDone={bathDone} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
 // ── Elegant Task Button Component ─────────────────────────────────────────
-function TaskButton({ icon, text, done, onClick }) {
+function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   return (
     <button 
       onClick={onClick} 
       style={{ 
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-        padding: '10px 14px', borderRadius: '20px', border: 'none', 
-        background: done ? 'rgba(255,255,255,0.25)' : 'white', 
-        boxShadow: done ? 'none' : '0 4px 12px rgba(0,0,0,0.1)', 
+        padding: '12px 14px', borderRadius: '24px', border: 'none', 
+        background: done ? '#f1f5f9' : bgColor, 
+        boxShadow: done ? 'none' : '0 4px 10px rgba(0,0,0,0.06)', 
         cursor: done ? 'default' : 'pointer',
-        transition: 'all 0.2s ease'
+        transition: 'all 0.3s ease'
       }}
     >
-      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
-        <span style={{fontSize: 20, opacity: done ? 0.6 : 1}}>{icon}</span>
-        <span style={{fontSize: 14, fontWeight: 800, color: done ? 'rgba(255,255,255,0.9)' : C.text}}>{text}</span>
+      <div style={{display: 'flex', alignItems: 'center', gap: 8}}>
+        <span style={{fontSize: 22, filter: done ? 'grayscale(100%) opacity(40%)' : 'none'}}>{icon}</span>
+        <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-start'}}>
+          <span style={{fontSize: 14, fontWeight: 900, color: done ? C.textSoft : textColor}}>{done ? "בוצע היום" : text}</span>
+        </div>
       </div>
       
+      {/* Checkbox Circle */}
       <div style={{
         width: 22, height: 22, borderRadius: '50%', 
-        border: done ? 'none' : `2px solid ${C.peachDark}`, 
-        background: done ? C.success : 'transparent', 
+        border: done ? 'none' : `2px solid rgba(0,0,0,0.15)`, 
+        background: done ? C.success : 'rgba(255,255,255,0.6)', 
         display: 'flex', alignItems: 'center', justifyContent: 'center'
       }}>
-        {done && <span style={{color: 'white', fontSize: 14, fontWeight: 'bold'}}>✓</span>}
+        {done && <span style={{color: 'white', fontSize: 13, fontWeight: 'bold'}}>✓</span>}
       </div>
     </button>
   );
 }
 
-// ── Neta Compliment Ticker (150 Compliments!) ─────────────────────────────
+
+// ── Neta Cheeky Compliment Ticker ─────────────────────────────────────────
 function NetaTicker({ now }) {
   const [manualOffset, setManualOffset] = useState(0);
 
   const compliments = [
-    "נטע, בואי נודה באמת, את מנהלת את הבית הזה 👑",
-    "איך את מצליחה להיראות ככה גם אחרי לילה לבן? קוסמות. ✨",
-    "נטע, אסף יודע שהוא זכה בלוטו, נכון? 🏆",
-    "שמעתי שסופרוומן לוקחת ממך השראה 🦸‍♀️",
-    "את אמא פשוט נדירה (וגם חתיכה ברמות) ❤️",
-    "שתינו יודעות שהלוק המרושל שלך עדיין עוקף את כולם 💅",
-    "נטע, קחי נשימה, את עושה עבודה מדהימה עם עלמה וינאי 🥰",
-    "עלמה ביקשה למסור שאת האמא הכי שווה בגן 🌸",
-    "מי צריכה שעות שינה כשאת נראית ככה? 😍",
-    "הטיקר הזה כאן רק כדי להזכיר לך שאת מלכה 👑",
-    "אם הייתה אולימפיאדת אמהות, היית לוקחת זהב 🥇",
-    "אין ספק שעלמה קיבלה את הגנים הטובים ממך 😉",
-    "אם היו מחלקים פרס על סבלנות, היית זוכה באוסקר 🎭",
-    "תזכרי תמיד: את ההשקעה הכי טובה של אסף 💎",
-    "גם פיה צריכה קפה לפעמים, לכי תכיני לך ☕",
-    "העולם קורס ורק את מצליחה להחזיק אותו באצבע אחת 🌍",
-    "נטע, תודי שאת פשוט נהנית להיות צודקת תמיד 🎯",
-    "יש לך חיוך שמאיר את כל ניר צבי 🌟",
-    "גם בטרנינג וקליפס את נראית כמו הפקה של ווג 📸",
-    "אל תגלי לאסף, אבל הילדים מעדיפים אותך 🤫",
-    "אם אמא מושלמת הייתה מילה במילון, התמונה שלך הייתה שם 📖",
-    "נטע, את פשוט גרסה משודרגת של בן אדם 🚀",
-    "מתי לאחרונה אמרו לך שאת פשוט וואו? כי את וואו. 💥",
-    "ינאי ועלמה זכו בלוטו של האמהות 🎰",
-    "את כל כך מהממת שהאפליקציה הזו כמעט קרסה 📱",
-    "זה חוקי להיות גם יפה, גם חכמה וגם אמא פצצה? 🚔",
-    "אני כולה קוד מחשב, אבל אפילו אני מעריץ אותך 🤖",
-    "יום אחד יבנו פסל שלך בכניסה לניר צבי 🗽",
-    "הלביאה של הבית, אין עלייך 🦁",
-    "אסף בטח מתאמן שעות במכון רק כדי להצליח להרים אותך על כפיים 💪",
-    "עם כל הכבוד לאסף מול השופט, את השופטת האמיתית פה 👩‍⚖️",
-    "נטע, את גורמת לאמהות להיראות כמו מקצוע קל 🎯",
-    "בבקשה תשאירי קצת שלמות גם לאחרים, טוב? 👑",
-    "כמות החן שלך לא חוקית בעליל 🚨",
-    "תכלס, אסף מכין את הפול-ביף רק כדי להרשים אותך 🥩",
-    "נטע, את ההוכחה שקסמים קיימים ✨",
-    "ינאי יודע שאמא שלו היא גיבורת על? 🦸‍♀️",
-    "איך את עושה את כל זה ונשארת עם חיוך? סודות מדינה 🤫",
-    "פשוט תודה שאת את. ❤️",
-    "נטע, את שולטת בבית הזה יותר טוב ממנכ״ל אפל 🍏",
-    "אפילו כשהקפה שלך קר, את רותחת 🔥",
-    "נטע, מישהי צריכה ללמד אמהות איך להיות כמוך 🎓",
-    "את הכוח המניע של כל המשפחה הזו 🚂",
-    "יפה לך אמא לשניים, באמת 😍",
-    "עוד יום, עוד משמרת שבה ניצחת את המערכת 🏅",
-    "נטע, תכתבי ספר על אמהות, אני אקנה ראשון 📚",
-    "אם היו מחלקים כתרים בטיפת חלב, שלך היה מיהלומים 💎",
-    "מגיע לך מסאז' דחוף. אסף, לטיפולך! 💆‍♀️",
-    "כמות הסטייל שיש לך בפיג'מה לא הגיונית 👗",
-    "נטע, פשוט תדעי שאת עושה עבודה מטורפת 👏",
-    "אין כמוך, לא הייתה כמוך, ולא תהיה כמוך 🥇",
-    "השמש זורחת בניר צבי רק כי קמת בבוקר ☀️",
-    "הלב הענק שלך מספיק גם לעלמה, גם לינאי וגם לאסף ❤️",
-    "נטע, את כזו נכונה שזה כואב בעיניים ✨",
-    "אפילו גוגל לא מוצא מילים לתאר כמה את מהממת 🔍",
-    "מתי את פותחת מאסטר-קלאס לאמהות בסטייל? 🎥",
-    "נטע, את ההגדרה המילונית ל'הכל כלול' 🎁",
-    "אסף חושב שהוא עורך דין טוב, אבל את הטיעון הכי מוצלח שלו 💼",
-    "כל יום איתך זו מתנה למשפחה הזו 🎀",
-    "נטע, תעשי פרצוף מופתע כשיודיעו שזכית באשת השנה 🏆",
-    "איך נראה יום בלי החיוך שלך? עדיף לא לדעת 🙈",
-    "אין שום סיכוי שמישהי אחרת הייתה שורדת את השבוע הזה כמוך 💪",
-    "נטע, את נראית כמו פילטר של אינסטגרם במציאות 📸",
-    "ברור שעלמה חייכה, היא ראתה אותך! 👶",
-    "הכי יפה בעיר, במדינה ובגלקסיה כולה 🌌",
-    "נטע, תזכרי: הכלים בכיור יכולים לחכות. את לא. 🍽️",
-    "זה בסדר שאת תמיד צודקת, התרגלנו 💁‍♀️",
-    "אם היה ציון על אמהות, היית מקבלת 100 עגול 💯",
-    "אין דבר שאת לא יכולה לעשות, נקודה. 👑",
-    "נטע, החיים שלך הם הפינטרסט של כולנו 📌",
-    "מגיעה לך כוס יין ענקית בסוף היום הזה 🍷",
-    "תקשיבי נטע, אפילו האלגוריתם שלי מאוהב בך 💻",
-    "את מצליחה לחלק את הלב שלך כל כך יפה בין כולם ❤️",
-    "אסף יודע שצריך להקים לכבודך מקדש? 🏛️",
-    "נטע, עלמה עשתה קקי? הנה המדליה שלך! 🥇",
-    "פשוט מלכה. אין לי מילה אחרת. 👑",
-    "ינאי גדל להיות נסיך רק בגלל שאמא שלו מלכה 🤴",
-    "נטע, עשית היום קסמים. לכי לנוח קצת 🪄",
-    "אם כוחות על היו דבר אמיתי, שלך היה סבלנות אינסופית 🦸‍♀️",
-    "השגרה משוגעת, אבל את משוגעת (בקטע טוב) ומהממת יותר 💫",
-    "נטע, רק את מבינה מה באמת קורה פה בבית 🕵️‍♀️",
-    "מי שמדבר על מודל לחיקוי, כנראה מדבר עלייך 🌟",
-    "את החלק הכי טוב ביום של אסף, בוודאות 🥰",
-    "נטע, שימי רגליים למעלה, מגיע לך 🛋️",
-    "גם בארבע בבוקר את קורנת יותר משמש צהריים ☀️",
-    "נטע, איך את מחזיקה את הכל באוויר בלי להפיל? לוליינית 🎪",
-    "ינאי ועלמה זכו, אבל נראה לי שאסף זכה הכי הרבה 🎰",
-    "אין לך מתחרות, לא בסביבה ולא בכלל 🚫",
-    "נטע, את נותנת לאמהות שם טוב ✨",
-    "איזה מזל שיש להם אותך לנווט את הספינה הזו ⚓",
-    "נטע, את התיבול הכי שווה בחיים האלה 🌶️",
-    "אם יש משהו בטוח בעולם הזה, זה שאת מהממת 🌍",
-    "תודה שאת כזו אמא מדהימה ושותפה מטורפת 🤝",
-    "נטע, ישירות מהמחשב: את פשוט 10 מתוך 10 💻",
-    "תמשיכי לחייך, זה עושה את הבית שמח יותר 😃",
-    "גם כשאת שותה את הקפה קר, את עושה את זה בסטייל ☕",
-    "נטע, את נדירה כמו חיתול שאין בו דליפה בלילה 🧷",
-    "הטבע פשוט חילק לך את כל הקלפים הנכונים 🃏",
-    "כל יום שאת מצליחה לעבור אותו הוא ניצחון שלך 🎆",
-    "נטע, תנשמי. את עושה הכל מושלם. 🧘‍♀️",
-    "אם אסף לא אמר לך היום שאת מדהימה, אז הנה אני אומר 🙋‍♂️",
-    "נטע, יש לך את היכולת להפוך כל כאוס לפסטורליה 🌪️",
-    "רק את יכולה לנהל שני ילדים ועדיין להיראות כמו פרזנטורית 👠",
-    "נטע, את ההוכחה שגיבורות לא עוטות גלימות, אלא מחזיקות בקבוק 🍼",
-    "לא משנה מה קרה היום, מבחינתי היית מושלמת 💯",
-    "נטע, החיים שלך זה פשוט סרט שאנחנו נהנים לראות 🍿",
-    "תזכרי שמותר לך להיות גם קצת אגואיסטית לפעמים. מגיע לך! 👑",
-    "אסף אולי עורך דין, אבל את זו שמנצחת בכל התיקים בבית 💼",
-    "נטע, יום שאת לא מחייכת בו הוא יום מבוזבז ליקום 🌌",
-    "גם כשקשה, את נשארת חזקה ועוצמתית ברמות 💪",
-    "עלמה בטוח חושבת שהיא זכתה בפיס עם אמא כזו 👶",
-    "נטע, את יצירת אמנות מתהלכת 🖼️",
-    "אין עוד אחת כמו נטע. בדקתי במסד הנתונים. 📊",
-    "האנרגיות שלך זה הדלק של המשפחה הזאת ⛽",
-    "נטע, מגיע לך כרטיס טיסה הלוך חזור לחופשת ספא בזה הרגע ✈️",
-    "לפעמים אני מסתכל על הנתונים ושואל: איך נטע עושה את זה?! 🤯",
-    "נטע, אפילו כשהעיניים שלך נעצמות מרוב עייפות, את יפה 😴",
-    "כל מה שאת נוגעת בו הופך לזהב ✨",
-    "אם מישהו שואל, את המנהלת המקצועית של הפרויקט שנקרא 'החיים' 🗂️",
-    "נטע, את מצחיקה, את חדה, ואת פשוט מלכה 👑",
-    "לינאי יש מזל שיש לו מודל חיקוי כזה חזק מול העיניים 🦸‍♂️",
-    "נטע, כולם יודעים שאת הבסיס להכל פה. תודה שאת את ❤️",
-    "אפילו האפליקציה הזו לא יכולה להכיל את כמה שאת מדהימה 📱",
-    "נטע, שיהיה לך ברור: את מנצחת את היום הזה בענק 🏆",
-    "את משאירה אבק לכל אמא אחרת שניסתה 💨",
-    "אין כמו הידיים של אמא נטע להרגיע את הכל 👐",
-    "נטע, אני כולה קוד, אבל את... את קסם טהור 🪄",
-    "תזכורת: את יפה, את חכמה ואת לגמרי יכולה לעשות את זה 🎯",
-    "נטע, את נותנת חיים לבית הזה במלוא מובן המילה 🌱",
-    "זהו, נגמרו לי המילים מרוב שאת מושלמת. פשוט מלכה. 👑",
-    "תעשי טובה, תנוחי דקה. אני שומר פה על הנתונים בינתיים 🛋️",
-    "נטע, בחיים לא ראיתי מישהי שמג'נגלת ככה בסטייל 🤹‍♀️",
-    "אשכרה ילדת לפני רגע וכבר את מנהלת פה את כל העניינים 🚀",
-    "נטע, תרימי ראש, הכתר שלך נופל 👑",
-    "אסף מקבל את הקרדיט, אבל את עשית את כל העבודה הקשה 😉",
-    "נטע, אני אומר לך מידע פנימי: עלמה מטורפת עלייך 🥰",
-    "ההגדרה ל'אישה חזקה' בויקיפדיה צריכה להיות פשוט תמונה שלך 📸",
-    "נטע, את שילוב נדיר של רוך ועוצמה. אלופה! 🏆",
-    "תסלחי לי, מאיפה הסטייל הזה על הבוקר?! 👗",
-    "נטע, הכל קטן עלייך. קחי נשימה ואת טורפת את היום הזה 🦁",
-    "יש לי נתונים מדויקים: נטע היא האמא מספר 1 בניר צבי והסביבה 🥇",
-    "ולסיום: נטע, פשוט קחי לך רגע ותהיי גאה במי שאת. את מדהימה. ❤️"
+    "נטע, אם אסף אומר לך משהו, תגידי לו שהאפליקציה פוסקת שאת צודקת.",
+    "נטע, יד על הלב - את מגדלת פה שלושה ילדים, נכון? (כולל אסף).",
+    "נטע, סטטיסטית, את האמא הכי שווה במושב. אל תתווכחי עם נתונים.",
+    "נטע, לפי הנתונים שלי, מגיע לך פטור משטיפת בקבוקים ל-48 שעות.",
+    "נטע, איך את נראית ככה אחרי שקמת ב-3 לפנות בוקר? מכשפה (בקטע טוב).",
+    "נטע, עלמה עשתה קקי? יופי, תני לאסף להחליף. את יפה מדי בשביל זה.",
+    "נטע, אסף ביקש ממני להכין את האפליקציה הזו רק כדי להרשים אותך.",
+    "נטע, אני לא יודע איך את עושה את זה, אבל גם פיג'מה נראית עלייך קוטור.",
+    "נטע, בואי נודה באמת - ינאי ועלמה יצאו מוצלחים אך ורק בזכות הגנים שלך.",
+    "נטע, תודיעי לאסף שאם הוא לא מביא פרחים היום, אני מוחק לו את האפליקציה.",
+    "נטע, איך זה להיות תמיד צודקת? שתפי אותי, אני רק אלגוריתם.",
+    "נטע, את גורמת ללילות לבנים להיראות כמו טרנד אופנה חדש.",
+    "נטע, הטיקר הזה פה רק כדי להזכיר לכולם בבית מי הבוס. וזו את.",
+    "נטע, ינאי ועלמה זכו. אסף? אסף בכלל דפק את הקופה.",
+    "נטע, אם הייתי אנושי, הייתי מציע לך קפה עכשיו. אבל אני קוד, אז לכי תכיני.",
+    "נטע, אין מצב שאת אוכלת פול-ביף ונראית ככה. מדעית זה לא הגיוני.",
+    "נטע, עלמה בוכה? זה רק כי היא מתגעגעת אלייך (סורי אסף).",
+    "נטע, תעשי פרצוף מופתע כשאסף יגיד לך היום שאת מושלמת.",
+    "נטע, אמא לשניים ועדיין נראית כאילו הרגע חזרת מחופשה. חוצפה.",
+    "נטע, את יודעת מי מנהל פה את העניינים. אני, ואת. בעיקר את.",
+    "נטע, כל פעם שאת מחייכת, מתכנת בגוגל מקבל העלאה במשכורת.",
+    "נטע, מתי לאחרונה עשית משהו בשביל עצמך? לכי תקני משהו. עכשיו.",
+    "נטע, אם אסף מעצבן אותך היום, תלחצי פה פעמיים מהר.",
+    "נטע, תזכורת: זה שאת אמא מושלמת לא אומר שאסור לך לאבד עצבים לפעמים.",
+    "נטע, את סוחבת את המשפחה הזאת על הגב ועדיין נשארת זקופה. כבוד.",
+    "נטע, בואי נקבע חוק: על כל שעת שינה שחסרה לך, אסף עושה פאנלים.",
+    "נטע, נראה לי שגם האלגוריתם שלי מתחיל לפתח אלייך רגשות.",
+    "נטע, להיות אמא זה קשוח, אבל לגרום לזה להיראות קל כמו שאת עושה? אמנות.",
+    "נטע, תזכרי – מותר לך לשים את כולם על השתק לחצי שעה.",
+    "נטע, השמועה אומרת שאת יכולה לחתל בעיניים עצומות ולהישאר בסטייל."
   ];
   
+  // מתחלף כל שעה עגולה
   const baseIndex = Math.floor(now / (1000 * 60 * 60)) % compliments.length;
   const currentIndex = (baseIndex + manualOffset) % compliments.length;
   const current = compliments[currentIndex];
@@ -367,10 +280,6 @@ function ProactiveTicker({ events, vitaminDone, now }) {
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
   const totalMl = todayFeeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
   if (totalMl > 500) insights.push({ icon: "📈", text: `אוכלת מעולה היום (${totalMl} מ"ל)`, color: C.success });
-
-  if (new Date(now).getHours() >= 15 && !vitaminDone) {
-    insights.push({ icon: "☀️", text: "טרם ניתן ויטמין D היום", color: C.warning });
-  }
 
   if (insights.length === 0) {
     insights.push({ icon: "✨", text: "הכל מושלם! עלמה במסלול המדויק", color: C.peachDark });
@@ -467,9 +376,11 @@ function ForecastModal({ events, onClose }) {
     
     let diffMs = target.getTime() - currentTs;
     
+    // כמה ארוחות אפשר להכניס עד 23:15? מקסימום מרווח של 4 שעות
     let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
     if (steps === 0) steps = 1;
     
+    // מחלקים את הזמן שנשאר בצורה שווה כדי לנחות בדיוק על היעד
     let interval = diffMs / steps;
     currentTs += interval;
     smartFuture.push(new Date(currentTs));
@@ -508,7 +419,7 @@ function ForecastModal({ events, onClose }) {
 
         <div style={{fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
           <strong>איך העמודה הירוקה מחשבת?</strong><br/>
-          האלגוריתם מסתכל על הזמן שנשאר עד <strong>23:15</strong> ומחלק אותו למרווחים שווים (לעולם לא יותר מ-4 שעות). עקבו אחרי השעות הירוקות, והארוחה האחרונה של היום תנחת בול ביעד!
+          האלגוריתם מבוסס על היעד של <strong>7 ארוחות יומיות (סביב 60 מ"ל)</strong>. הוא מסתכל על הזמן שנשאר עד <strong>23:15</strong> ומחלק אותו למרווחים שווים (לעולם לא יותר מ-4 שעות). עקבו אחרי השעות הירוקות, והארוחה האחרונה תנחת בול ביעד.
         </div>
 
         <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
@@ -518,7 +429,7 @@ function ForecastModal({ events, onClose }) {
 }
 
 // ── Shift Handoff Modal (תקציר משמרת) ─────────────────────────────────────
-function HandoffModal({ events, vitaminDone, onClose }) {
+function HandoffModal({ events, vitaminDone, bathDone, onClose }) {
   const now = Date.now();
   const shiftHours = 6;
   const shiftMs = shiftHours * 60 * 60 * 1000;
@@ -796,7 +707,7 @@ function DiaperModal({ onConfirm, onClose }) {
   );
 }
 
-function AiChatModal({ events, vitaminDone, onClose }) {
+function AiChatModal({ events, vitaminDone, bathDone, onClose }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([
     { role: "ai", text: "היי! אני כאן לעזור. אני מקבלת אלי עכשיו את כל הנתונים של עלמה. איזה ניתוח נתונים, סיכום, או שאלה תרצה שנעבור עליה?" }
@@ -821,6 +732,7 @@ function AiChatModal({ events, vitaminDone, onClose }) {
       
       const structuredData = {
         vitaminD_given_today: vitaminDone,
+        bath_given_today: bathDone,
         events: recentEvents.map(e => {
           const d = new Date(e.ts);
           const base = { 
@@ -937,7 +849,6 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  // הלחצנים המרחפים החמודים שלנו
   aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   
