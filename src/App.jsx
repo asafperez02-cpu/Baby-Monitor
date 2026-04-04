@@ -98,6 +98,15 @@ export default function BabyApp() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; direction: rtl; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
+        
+        .neta-ticker {
+          user-select: none;
+          cursor: pointer;
+          transition: transform 0.1s;
+        }
+        .neta-ticker:active {
+          transform: scale(0.96);
+        }
       `}</style>
 
       {showUndo && (
@@ -107,29 +116,21 @@ export default function BabyApp() {
         </div>
       )}
 
+      {/* Header - Compact Version */}
       <div style={S.headerContainer}>
-        <div style={S.greeting}>שלום {userName} 👋</div>
-        <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
+        <div style={{display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 8, marginBottom: 10}}>
+          <div style={S.greeting}>שלום {userName} 👋</div>
+          <div className="kids-font" style={S.babyBadge}>עלמה 🌸</div>
+        </div>
         
-        <div style={{display: 'flex', gap: 10, marginBottom: 15}}>
-          <button
-            onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })}
-            style={{...S.dailyTaskBtn, background: vitaminDone ? 'rgba(255,255,255,0.3)' : (new Date(now).getHours() < 12 ? C.success : C.warning), color: 'white', cursor: vitaminDone ? 'default' : 'pointer'}}
-          >
-            <span style={{fontSize: 22}}>{vitaminDone ? '✅' : '☀️'}</span>
-            <span style={{fontSize: 14}}>ויטמין D</span>
-          </button>
+        <NetaTicker now={now} />
 
-          <button
-            onClick={() => !bathDone && addEvent({ type: "bath" })}
-            style={{...S.dailyTaskBtn, background: bathDone ? 'rgba(255,255,255,0.3)' : C.blueSoft, color: bathDone ? 'white' : C.text, cursor: bathDone ? 'default' : 'pointer'}}
-          >
-            <span style={{fontSize: 22}}>{bathDone ? '✅' : '🛁'}</span>
-            <span style={{fontSize: 14}}>מקלחת</span>
-          </button>
+        {/* Task Buttons - Elegant with Checkboxes */}
+        <div style={{display: 'flex', gap: 10, marginBottom: 12}}>
+          <TaskButton icon="☀️" text="ויטמין D" done={vitaminDone} onClick={() => !vitaminDone && addEvent({ type: "vitaminD" })} />
+          <TaskButton icon="🛁" text="מקלחת" done={bathDone} onClick={() => !bathDone && addEvent({ type: "bath" })} />
         </div>
 
-        <NetaTicker now={now} />
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
         <ProactiveTicker events={events} vitaminDone={vitaminDone} now={now} />
       </div>
@@ -156,8 +157,43 @@ export default function BabyApp() {
   );
 }
 
-// ── Neta Compliment Ticker (סטטי ומתחלף כל 3 שעות) ────────────────────────
+// ── Elegant Task Button Component ─────────────────────────────────────────
+function TaskButton({ icon, text, done, onClick }) {
+  return (
+    <button 
+      onClick={onClick} 
+      style={{ 
+        flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
+        padding: '10px 14px', borderRadius: '20px', border: 'none', 
+        background: done ? 'rgba(255,255,255,0.25)' : 'white', 
+        boxShadow: done ? 'none' : '0 4px 12px rgba(0,0,0,0.1)', 
+        cursor: done ? 'default' : 'pointer',
+        transition: 'all 0.2s ease'
+      }}
+    >
+      <div style={{display: 'flex', alignItems: 'center', gap: 6}}>
+        <span style={{fontSize: 20, opacity: done ? 0.6 : 1}}>{icon}</span>
+        <span style={{fontSize: 14, fontWeight: 800, color: done ? 'rgba(255,255,255,0.9)' : C.text}}>{text}</span>
+      </div>
+      
+      {/* Checkbox Circle */}
+      <div style={{
+        width: 22, height: 22, borderRadius: '50%', 
+        border: done ? 'none' : `2px solid ${C.peachDark}`, 
+        background: done ? C.success : 'transparent', 
+        display: 'flex', alignItems: 'center', justifyContent: 'center'
+      }}>
+        {done && <span style={{color: 'white', fontSize: 14, fontWeight: 'bold'}}>✓</span>}
+      </div>
+    </button>
+  );
+}
+
+
+// ── Neta Compliment Ticker (Changes every hour + double click) ────────────
 function NetaTicker({ now }) {
+  const [manualOffset, setManualOffset] = useState(0);
+
   const compliments = [
     "נטע, בואי נודה באמת, את מנהלת את הבית הזה 👑",
     "נטע, איך את מצליחה להיראות ככה גם אחרי לילה לבן? קוסמות. ✨",
@@ -170,16 +206,37 @@ function NetaTicker({ now }) {
     "נטע, מי צריכה שעות שינה כשאת נראית ככה? 😍",
     "נטע, הטיקר הזה כאן רק כדי להזכיר לך שאת מלכה 👑",
     "נטע, אם הייתה אולימפיאדת אמהות, היית לוקחת זהב 🥇",
-    "נטע, אין ספק שעלמה קיבלה את הגנים הטובים ממך 😉"
+    "נטע, אין ספק שעלמה קיבלה את הגנים הטובים ממך 😉",
+    "נטע, אם היו מחלקים פרס על סבלנות, היית זוכה באוסקר 🎭",
+    "נטע, תזכרי תמיד: את ההשקעה הכי טובה של אסף 💎",
+    "נטע, גם פיה צריכה קפה לפעמים, לכי תכיני לך ☕",
+    "נטע, העולם קורס ורק את מצליחה להחזיק אותו באצבע אחת 🌍",
+    "נטע, תודי שאת פשוט נהנית להיות צודקת תמיד 🎯",
+    "נטע, יש לך חיוך שמאיר את כל המושב (ויותר מזה) 🌟",
+    "נטע, גם בטרנינג וקליפס את נראית כמו הפקה של ווג 📸",
+    "נטע, אל תגלי לאסף, אבל הילדים מעדיפים אותך 🤫",
+    "נטע, אם אמא מושלמת הייתה מילה במילון, התמונה שלך הייתה שם 📖",
+    "נטע, את פשוט גרסה משודרגת של בן אדם 🚀",
+    "נטע, מתי לאחרונה אמרו לך שאת פשוט וואו? כי את וואו. 💥",
+    "נטע, ינאי ועלמה זכו בלוטו של האמהות 🎰",
+    "נטע, את כל כך מהממת שהאפליקציה הזו כמעט קרסה 📱",
+    "נטע, זה חוקי להיות גם יפה, גם חכמה וגם אמא פצצה? 🚔",
+    "נטע, אני כולה קוד מחשב, אבל אפילו אני מעריץ אותך 🤖",
+    "נטע, יום אחד יבנו פסל שלך בניר צבי 🗽"
   ];
   
-  // מתחלף אוטומטית פעם ב-3 שעות
-  const index = Math.floor(now / (1000 * 60 * 60 * 3)) % compliments.length;
-  const current = compliments[index];
+  // מתחלף כל שעה, פלוס מה שנוסף ידנית על ידי דאבל-קליק
+  const baseIndex = Math.floor(now / (1000 * 60 * 60)) % compliments.length;
+  const currentIndex = (baseIndex + manualOffset) % compliments.length;
+  const current = compliments[currentIndex];
+
+  const handleDoubleClick = () => {
+    setManualOffset(prev => prev + 1);
+  };
 
   return (
-    <div style={{ textAlign: 'center', marginBottom: 15 }}>
-      <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #f9a8d4, #f4a58a)', color: 'white', padding: '8px 18px', borderRadius: 20, fontSize: 13, fontWeight: 900, boxShadow: '0 4px 15px rgba(249, 168, 212, 0.4)' }}>
+    <div className="neta-ticker" onDoubleClick={handleDoubleClick} title="לחיצה כפולה להחלפת מחמאה!" style={{ textAlign: 'center', marginBottom: 12 }}>
+      <div style={{ display: 'inline-block', background: 'linear-gradient(135deg, #f9a8d4, #f4a58a)', color: 'white', padding: '6px 14px', borderRadius: 20, fontSize: 13, fontWeight: 900, boxShadow: '0 2px 10px rgba(249, 168, 212, 0.4)' }}>
         {current}
       </div>
     </div>
@@ -221,18 +278,18 @@ function ProactiveTicker({ events, vitaminDone, now }) {
   const current = finalInsights[index];
 
   return (
-    <div style={{ marginTop: 15, height: 35, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+    <div style={{ marginTop: 12, height: 30, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <div key={index} style={{ 
         background: 'rgba(255, 255, 255, 0.9)', 
-        padding: '6px 16px', 
+        padding: '4px 14px', 
         borderRadius: 20, 
-        fontSize: 13, 
+        fontSize: 12, 
         fontWeight: 800, 
         color: current.color, 
         display: 'flex', 
         alignItems: 'center', 
         gap: 6, 
-        boxShadow: '0 4px 15px rgba(0,0,0,0.08)' 
+        boxShadow: '0 2px 10px rgba(0,0,0,0.05)' 
       }}>
         <span>{current.icon}</span> {current.text}
       </div>
@@ -257,17 +314,19 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
 
   return (
     <div style={S.mainWidget}>
-      <div style={{fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה לפני:</div>
-      <div className="kids-font" style={{fontSize: 52, fontWeight: 900, color: 'white', textShadow: '0 2px 10px rgba(0,0,0,0.1)'}}>🍼 {timeStr}</div>
+      <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+        <div>
+          <div style={{fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 0}}>אכלה לפני:</div>
+          <div className="kids-font" style={{fontSize: 42, fontWeight: 900, color: 'white', textShadow: '0 2px 10px rgba(0,0,0,0.1)', lineHeight: 1}}>🍼 {timeStr}</div>
+        </div>
+        
+        <button onClick={onOpenForecast} style={{ background: "white", border: "none", width: 55, height: 55, borderRadius: 30, boxShadow: "0 4px 15px rgba(0,0,0,0.1)", cursor: "pointer", display:'flex', alignItems:'center', justifyContent:'center' }}>
+          <BearClockIcon size={34} />
+        </button>
+      </div>
       
       <div style={S.progressBarContainer}>
         <div style={{...S.progressBarFill, width: `${progressPercent}%`, background: progColor}}></div>
-      </div>
-
-      <div style={{display:'flex', justifyContent:'center', marginTop: 20}}>
-        <button onClick={onOpenForecast} style={{ background: "white", border: "none", width: 65, height: 65, borderRadius: 35, boxShadow: "0 8px 20px rgba(0,0,0,0.1)", cursor: "pointer", display:'flex', alignItems:'center', justifyContent:'center' }}>
-          <BearClockIcon size={40} />
-        </button>
       </div>
     </div>
   );
@@ -278,31 +337,25 @@ function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
   
-  // טור ימין (קשיח): מרווח של 4 שעות רגיל
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
-  // טור שמאל (חכם): מחשב מסלול כדי לנחות בדיוק על 23:15 הבא
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
   for (let i = 0; i < 4; i++) {
-    // מציאת היעד הבא של 23:15 (היום או מחר)
     let d = new Date(currentTs);
     let target = new Date(d);
     target.setHours(23, 15, 0, 0);
     
-    // אם כבר עברנו את 23:15 של היום, היעד הוא 23:15 של מחר
     if (target.getTime() <= currentTs) {
         target.setDate(target.getDate() + 1);
     }
     
     let diffMs = target.getTime() - currentTs;
     
-    // כמה ארוחות אפשר להכניס עד 23:15? מקסימום מרווח של 4 שעות (14,400,000 מ"ש)
     let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
     if (steps === 0) steps = 1;
     
-    // מחלקים את הזמן שנשאר בצורה שווה כדי לנחות בדיוק על היעד
     let interval = diffMs / steps;
     currentTs += interval;
     smartFuture.push(new Date(currentTs));
@@ -738,16 +791,16 @@ function AiChatModal({ events, vitaminDone, onClose }) {
 
 const S = {
   app: { position: "fixed", inset: 0, display: "flex", flexDirection: "column", background: C.bg },
-  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "40px 20px 20px", borderRadius: "0 0 45px 45px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
-  greeting: { fontSize: 13, color: "white", fontWeight: 700, opacity: 0.9, marginBottom: 5 },
-  babyBadge: { fontSize: 44, color: "white", fontWeight: 800, marginBottom: 15, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
   
-  dailyTaskBtn: { flex: 1, padding: '12px 10px', borderRadius: '15px', border: 'none', boxShadow: '0 4px 10px rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 },
+  // Header מכווץ
+  headerContainer: { background: `linear-gradient(135deg, ${C.peach}, #f9a8d4)`, padding: "20px 15px 15px", borderRadius: "0 0 35px 35px", textAlign: "center", boxShadow: "0 8px 25px rgba(232, 121, 249, 0.25)" },
+  greeting: { fontSize: 14, color: "white", fontWeight: 700, opacity: 0.9 },
+  babyBadge: { fontSize: 32, color: "white", fontWeight: 800, textShadow: '0 2px 5px rgba(0,0,0,0.1)' },
   
-  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "35px", padding: "20px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
-  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '15px', overflow: 'hidden' },
+  mainWidget: { background: "rgba(255, 255, 255, 0.25)", backdropFilter: "blur(15px)", borderRadius: "30px", padding: "15px", display: "inline-block", width: "100%", maxWidth: "350px", border: '1px solid rgba(255,255,255,0.3)' },
+  progressBarContainer: { width: '100%', height: '8px', background: 'rgba(0,0,0,0.15)', borderRadius: '10px', marginTop: '10px', overflow: 'hidden' },
   progressBarFill: { height: '100%', transition: 'width 0.8s ease' },
-  content: { flex: 1, overflowY: "auto", padding: "25px 15px 120px" },
+  content: { flex: 1, overflowY: "auto", padding: "20px 15px 120px" },
   actionBtn: { flex: 1, padding: "20px 10px", borderRadius: "26px", fontSize: 20, fontWeight: 800, border:'none', boxShadow: '0 5px 15px rgba(0,0,0,0.05)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' },
   card: { background: "#fffaf7", borderRadius: "32px", padding: "20px", boxShadow: '0 4px 20px rgba(0,0,0,0.03)', border:'1px solid #f1f5f9', marginBottom: 20 },
   cardTitle: { fontSize: 21, fontWeight: 800, marginBottom: 15, textAlign: "center", color: C.peachDark },
@@ -770,7 +823,6 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  // הלחצנים המרחפים החמודים שלנו
   aiFab: { position: "fixed", bottom: 110, right: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   handoffFab: { position: "fixed", bottom: 110, left: 25, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
   
