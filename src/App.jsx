@@ -44,7 +44,6 @@ function getTimeGap(ts1, ts2) {
   const rm = m % 60;
   return rm ? `${h}:${rm.toString().padStart(2, '0')} ש׳` : `${h} ש׳`;
 }
-// הופך כוכביות של AI לטקסט מודגש אמיתי ב-HTML
 function parseAiText(text) {
   const html = text.replace(/\n/g, '<br/>').replace(/\*\*(.*?)\*\*/g, `<strong style="color: ${C.peachDark}; font-weight: 900;">$1</strong>`);
   return { __html: html };
@@ -89,6 +88,7 @@ export default function BabyApp() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: ${FONT_MAIN}; }
         body { margin: 0; background: ${C.bg}; overflow: hidden; direction: rtl; }
         .kids-font { font-family: ${FONT_KIDS} !important; }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translateY(5px); } 10% { opacity: 1; transform: translateY(0); } 90% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-5px); } }
       `}</style>
 
       {showUndo && (
@@ -112,7 +112,7 @@ export default function BabyApp() {
         )}
 
         <MainTimerWidget events={events} now={now} onOpenForecast={() => setModal("forecast")} />
-        <ProactiveInsights events={events} vitaminDone={vitaminDone} now={now} />
+        <ProactiveTicker events={events} vitaminDone={vitaminDone} now={now} />
       </div>
 
       <div style={S.content}>
@@ -120,7 +120,9 @@ export default function BabyApp() {
         {tab === "analytics" && <AnalyticsView events={events} />}
       </div>
 
+      {/* Floating Action Buttons */}
       <button onClick={() => setModal("ai")} style={S.aiFab}>🍼</button>
+      <button onClick={() => setModal("handoff")} style={S.handoffFab}>🪄</button>
 
       <div style={S.nav}>
         <button onClick={() => setTab("home")} style={S.navBtn(tab === "home")}>🏠 ALMA</button>
@@ -136,36 +138,47 @@ export default function BabyApp() {
   );
 }
 
-// ── Insights Bar (Proactive) ──────────────────────────────────────────────
-function ProactiveInsights({ events, vitaminDone, now }) {
+// ── Proactive Ticker (Breathing Insights) ─────────────────────────────────
+function ProactiveTicker({ events, vitaminDone, now }) {
+  const [index, setIndex] = useState(0);
   const insights = [];
   
   const lastPoop = events.find(e => e.type === "diaper" && e.poop);
   if (lastPoop && (now - lastPoop.ts) > 24 * 60 * 60 * 1000) {
-    insights.push({ icon: "💩", text: "שימו לב: עברו מעל 24 שעות ללא קקי", color: C.danger });
+    insights.push({ icon: "💩", text: "שימו לב: אין קקי מעל 24 שעות", color: C.danger });
   }
 
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
   const totalMl = todayFeeds.reduce((sum, e) => sum + Number(e.ml || 0), 0);
-  if (totalMl > 500) insights.push({ icon: "📈", text: `אכלה יפה היום (${totalMl} מ"ל)`, color: C.success });
+  if (totalMl > 500) insights.push({ icon: "📈", text: `אוכלת מעולה היום (${totalMl} מ"ל)`, color: C.success });
 
   if (new Date(now).getHours() >= 15 && !vitaminDone) {
-    insights.push({ icon: "☀️", text: "אל תשכחו ויטמין D!", color: C.warning });
+    insights.push({ icon: "☀️", text: "טרם ניתן ויטמין D היום", color: C.warning });
   }
 
-  if (insights.length === 0) return null;
+  // חיתוך ל-3 תובנות מקסימום
+  const finalInsights = insights.slice(0, 3);
+
+  useEffect(() => {
+    if (finalInsights.length <= 1) return;
+    const interval = setInterval(() => {
+      setIndex((prev) => (prev + 1) % finalInsights.length);
+    }, 4000); // מתחלף כל 4 שניות
+    return () => clearInterval(interval);
+  }, [finalInsights.length]);
+
+  if (finalInsights.length === 0) return null;
+
+  const current = finalInsights[index];
 
   return (
-    <div style={{ marginTop: 15, background: 'rgba(255,255,255,0.2)', borderRadius: 15, padding: '10px', display: 'flex', gap: 10, overflowX: 'auto', whiteSpace: 'nowrap' }}>
-      {insights.map((ins, i) => (
-        <div key={i} style={{ background: 'white', padding: '8px 12px', borderRadius: 12, fontSize: 13, fontWeight: 800, color: ins.color, display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-          <span>{ins.icon}</span> {ins.text}
-        </div>
-      ))}
+    <div style={{ marginTop: 15, height: 35, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <div key={index} style={{ animation: 'fadeInOut 4s ease-in-out infinite', background: 'white', padding: '6px 16px', borderRadius: 20, fontSize: 13, fontWeight: 800, color: current.color, display: 'flex', alignItems: 'center', gap: 6, boxShadow: '0 4px 15px rgba(0,0,0,0.08)' }}>
+        <span>{current.icon}</span> {current.text}
+      </div>
     </div>
   );
 }
-
 
 // ── Components ──────────────────────────────────────────────────────────────
 
@@ -182,8 +195,6 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
   if (diffMin > 150) progColor = C.warning;
   if (diffMin > 210) progColor = C.danger;
 
-  const nextTarget = new Date(lastFeed.ts + 4 * 60 * 60 * 1000);
-
   return (
     <div style={S.mainWidget}>
       <div style={{fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.9)', marginBottom: 2}}>אכלה לפני:</div>
@@ -195,10 +206,7 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
 
       <div style={{display:'flex', justifyContent:'center', marginTop: 20}}>
         <button onClick={onOpenForecast} style={S.forecastBtn}>
-          <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark, marginBottom: 5}}>תכנון ארוחות ולילה</div>
-          <div style={{fontSize: 24, fontWeight: 900, color: C.text, display: 'flex', alignItems: 'center', gap: 8}}>
-            <span>⏰</span> {fmtTime(nextTarget.getTime())}
-          </div>
+          <div style={{fontSize: 15, fontWeight: 800, color: C.peachDark}}>תחזית וניהול זמני לילה ⏰</div>
         </button>
       </div>
     </div>
@@ -224,8 +232,8 @@ function HandoffModal({ events, vitaminDone, onClose }) {
     <div style={S.overlay} onClick={onClose}>
       <div style={{...S.modal, maxWidth: 400, padding: 0, overflow: 'hidden'}} onClick={e=>e.stopPropagation()}>
         <div style={{background: C.peach, padding: '25px 20px', textAlign: 'center', color: 'white'}}>
-          <h3 className="kids-font" style={{margin: 0, fontSize: 26}}>תקציר משמרת 🤝</h3>
-          <p style={{margin: '5px 0 0', opacity: 0.9, fontSize: 14}}>סיכום {shiftHours} השעות האחרונות</p>
+          <h3 className="kids-font" style={{margin: 0, fontSize: 26}}>העברת מקל 🪄</h3>
+          <p style={{margin: '5px 0 0', opacity: 0.9, fontSize: 14}}>תקציר מנהלים - {shiftHours} שעות אחרונות</p>
         </div>
         
         <div style={{padding: '25px 20px'}}>
@@ -235,12 +243,12 @@ function HandoffModal({ events, vitaminDone, onClose }) {
               {lastFeed ? (
                 <>
                   <div style={{display:'flex', justifyContent:'space-between', marginBottom: 5}}>
-                    <span style={{fontWeight: 800}}>ארוחה אחרונה:</span>
+                    <span style={{fontWeight: 800}}>האכלה אחרונה:</span>
                     <span style={{fontWeight: 900, color: C.text}}>{fmtTime(lastFeed.ts)} ({lastFeed.ml} מ"ל)</span>
                   </div>
                   <div style={{display:'flex', justifyContent:'space-between'}}>
                     <span style={{fontWeight: 800}}>סה"כ במשמרת:</span>
-                    <span style={{fontWeight: 900}}>{totalMl} מ"ל ({feeds.length} ארוחות)</span>
+                    <span style={{fontWeight: 900}}>{totalMl} מ"ל ({feeds.length} מנות)</span>
                   </div>
                 </>
               ) : <div style={{fontWeight: 800}}>לא תועדו האכלות במשמרת זו.</div>}
@@ -260,11 +268,11 @@ function HandoffModal({ events, vitaminDone, onClose }) {
           </div>
 
           <div style={{marginBottom: 20}}>
-            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>💡 תובנות ודגשים להמשך</h4>
+            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>💡 תובנות ודגשים</h4>
             <ul style={{margin: 0, paddingRight: 20, fontWeight: 700, color: C.textSoft, lineHeight: 1.6}}>
-              {poopCount === 0 && <li style={{color: C.danger}}>לא עשתה קקי במשמרת! כדאי לעקוב בהחתלה הבאה.</li>}
-              {!vitaminDone && <li>טרם קיבלה ויטמין D היום.</li>}
-              {lastFeed && <li><strong style={{color:C.peachDark}}>ארוחה הבאה (משוערת):</strong> סביב השעה {fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.</li>}
+              {poopCount === 0 && <li style={{color: C.danger}}>לא היה קקי במשמרת הזו, לשים לב!</li>}
+              {!vitaminDone && <li>לא לשכוח לתת ויטמין D.</li>}
+              {lastFeed && <li><strong style={{color:C.peachDark}}>יעד משוער להאכלה הבאה:</strong> סביב {fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.</li>}
             </ul>
           </div>
 
@@ -275,6 +283,93 @@ function HandoffModal({ events, vitaminDone, onClose }) {
   );
 }
 
+// ── Smart Night Forecast Modal (טייס אוטומטי ללילה) ───────────────────────
+function ForecastModal({ events, onClose }) {
+  const lastFeed = events.find(e => e.type === "feed");
+  if (!lastFeed) return null;
+  
+  // טור ימין: תחזית "טיפשה" - בדיוק 4 שעות מרווח
+  const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
+  
+  // טור שמאל: תחזית חכמה (טייס אוטומטי ליעדים 23:30, 03:15, 06:45)
+  const smartFuture = [];
+  let currentTs = lastFeed.ts;
+
+  for(let i = 0; i < 4; i++) {
+    let nextTarget;
+    let currentHour = new Date(currentTs).getHours();
+    let currentMin = new Date(currentTs).getMinutes();
+    let timeFloat = currentHour + currentMin / 60;
+
+    if (timeFloat >= 23.5 || timeFloat < 3.25) {
+      // יעד 03:15
+      let t = new Date(currentTs);
+      if (timeFloat >= 23.5) t.setDate(t.getDate() + 1);
+      t.setHours(3, 15, 0, 0);
+      nextTarget = t.getTime();
+    } else if (timeFloat >= 3.25 && timeFloat < 6.75) {
+      // יעד 06:45
+      let t = new Date(currentTs);
+      t.setHours(6, 45, 0, 0);
+      nextTarget = t.getTime();
+    } else {
+      // יעד 23:30
+      let t = new Date(currentTs);
+      t.setHours(23, 30, 0, 0);
+      nextTarget = t.getTime();
+    }
+
+    // חישוב מרווח דינמי כדי לנחות בדיוק על היעד
+    let diffMs = nextTarget - currentTs;
+    let steps = Math.max(1, Math.round(diffMs / (4 * 3600000))); // כמה ארוחות נכנסות עד היעד
+    if (timeFloat >= 23.5 || timeFloat < 6.75) steps = 1; // בלילה לא מפצלים, חותכים ישירות ליעד הבא
+    
+    let interval = diffMs / steps;
+    currentTs += interval;
+    smartFuture.push(new Date(currentTs));
+  }
+
+  return (
+    <div style={S.overlay} onClick={onClose}>
+      <div style={{...S.modal, width: '95%', maxWidth: 450, padding: '30px 20px'}} onClick={e=>e.stopPropagation()}>
+        <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, margin: '0 0 20px', fontSize: 22}}>תכנון זמנים ויישור ללילה 🌙</h3>
+        
+        <div style={{display: 'flex', gap: 10}}>
+          {/* עמודה ימנית (קשיחה) */}
+          <div style={{flex: 1, background: '#f8fafc', padding: 15, borderRadius: 15, border: '1px solid #e2e8f0'}}>
+            <div style={{fontWeight: 800, fontSize: 13, color: C.textSoft, textAlign: 'center', marginBottom: 15, height: 35}}>
+              כל 4 שעות רגיל<br/>(מרווח קשיח)
+            </div>
+            {dumbFuture.map((t, i) => (
+              <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #cbd5e1' : 'none'}}>
+                <span style={{fontWeight:900, fontSize:20, color: C.textSoft}}>{fmtTime(t.getTime())}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* עמודה שמאלית (חכמה) */}
+          <div style={{flex: 1, background: '#ecfdf5', padding: 15, borderRadius: 15, border: '1px solid #a7f3d0'}}>
+            <div style={{fontWeight: 900, fontSize: 13, color: C.success, textAlign: 'center', marginBottom: 15, height: 35}}>
+              תחזית חכמה<br/>(יעד לילה מושלם)
+            </div>
+            {smartFuture.map((t, i) => (
+              <div key={i} style={{textAlign: 'center', padding: '10px 0', borderBottom: i < 3 ? '1px dotted #a7f3d0' : 'none'}}>
+                <span style={{fontWeight:900, fontSize:20, color: '#059669'}}>{fmtTime(t.getTime())}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{marginTop: 20, fontSize: 12, color: C.textSoft, textAlign: 'center', lineHeight: 1.5, background: C.creamSoft, padding: 10, borderRadius: 10}}>
+          <strong>איך התחזית החכמה עובדת?</strong><br/>
+          האלגוריתם מותח או מכווץ את המרווחים במהלך היום כדי לוודא שהארוחה המכרעת תיפול בדיוק ב-<strong>23:30</strong>. לאחר מכן, הוא יכוון אוטומטית ליעדי ההשכמה: <strong>03:15</strong> ו-<strong>06:45</strong> לקראת הבוקר של ינאי.
+        </div>
+
+        <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>הבנתי, סגור</button>
+      </div>
+    </div>
+  );
+}
 
 function HomeView({ events, setModal, onDelete }) {
   const todayFeeds = events.filter(e => e.type === "feed" && isToday(e.ts));
@@ -291,10 +386,6 @@ function HomeView({ events, setModal, onDelete }) {
 
   return (
     <div style={{display:'flex', flexDirection:'column', gap:20}}>
-      
-      <button onClick={() => setModal("handoff")} style={{background: 'white', border: `2px solid ${C.peach}`, borderRadius: 20, padding: 15, fontWeight: 900, color: C.peachDark, fontSize: 18, boxShadow: '0 4px 10px rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10}}>
-        🤝 תקציר חפיפה להורה הבא
-      </button>
 
       <div style={{display:'flex', gap:15}}>
         <button onClick={() => setModal("feed")} style={{...S.actionBtn, background:'#fffdef', color:'#854d0e', border:'1px solid #f7e0b5'}}>
@@ -367,7 +458,6 @@ function HomeView({ events, setModal, onDelete }) {
   );
 }
 
-// ── Analytics, Modals & AI Chat (With Markdown Fix) ────────────────────────
 function AnalyticsView({ events }) {
   const daysMap = {};
   events.forEach(e => {
@@ -482,60 +572,6 @@ function DiaperModal({ onConfirm, onClose }) {
   );
 }
 
-// ── Smart Night Forecast Modal ────────────────────────────────────────────
-function ForecastModal({ events, onClose }) {
-  const lastFeed = events.find(e => e.type === "feed");
-  if (!lastFeed) return null;
-  
-  const future = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
-  const nextFeed = future[0];
-  
-  // לוגיקת יישור הלילה
-  const nextHour = nextFeed.getHours();
-  let nightAdvice = "";
-  let isNightFocus = false;
-
-  // אם הארוחה הבאה נופלת באזור הערב/תחילת לילה (19:00 - 23:00)
-  if (nextHour >= 19 && nextHour <= 23) {
-    isNightFocus = true;
-    const diffToIdeal = Math.round((new Date(nextFeed).setHours(23, 30, 0) - nextFeed) / 60000);
-    if (Math.abs(diffToIdeal) <= 30) {
-      nightAdvice = "מעולה! אתם מיושרים בול לארוחת לילה ב-23:30 שתמשוך את עלמה יפה עד לארוחה של 03:15.";
-    } else if (diffToIdeal > 30) {
-      nightAdvice = `הארוחה הבאה מוקדמת מדי. נסו "למשוך" את עלמה קצת או לפצל את הארוחה כדי להגיע להאכלה מלאה קרוב יותר ל-23:30.`;
-    } else {
-      nightAdvice = `הארוחה הבאה קצת מאוחרת מ-23:30. כדי לא לפגוע בשגרת ההשכמה ב-06:45, אולי כדאי להקדים מעט את הארוחה הזו.`;
-    }
-  }
-
-  return (
-    <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
-      <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark}}>תחזית וניהול זמנים ⏰</h3>
-      
-      <div style={{background: '#f8fafc', padding: 15, borderRadius: 15, marginBottom: 20, border: '1px solid #e2e8f0'}}>
-        <div style={{fontWeight: 900, color: C.text, marginBottom: 10, textAlign: 'center'}}>יישור קו - "שגרת לילה לינאי" 🌙</div>
-        <div style={{fontSize: 13, color: C.textSoft, lineHeight: 1.5, textAlign: 'justify'}}>
-          המטרה: ארוחות ב-<strong>23:30</strong>, <strong>03:15</strong>, והשכמה ב-<strong>06:45</strong> כדי להיות מוכנים לינאי בשבע. 
-        </div>
-        {isNightFocus && (
-          <div style={{marginTop: 10, padding: 10, background: C.creamSoft, borderRadius: 10, fontSize: 13, fontWeight: 800, color: C.peachDark, borderLeft: `4px solid ${C.peach}`}}>
-            {nightAdvice}
-          </div>
-        )}
-      </div>
-
-      <div style={{textAlign:'center', fontSize:13, color:C.textSoft, marginBottom: 10}}>הזמנים לפי מרווח נקי של 4 שעות:</div>
-      {future.map((t, i) => (
-        <div key={i} style={{display:'flex', justifyContent:'space-between', padding:'12px 0', borderBottom:'1px dotted #eee', alignItems: 'center'}}>
-          <span style={{fontWeight: 700}}>ארוחה {i+1}:</span>
-          <span style={{fontWeight:900, fontSize:22, color: i===0 ? C.peachDark : C.text}}>{fmtTime(t.getTime())}</span>
-        </div>
-      ))}
-      <button onClick={onClose} style={{...S.primaryBtn, marginTop:20}}>סגור</button>
-    </div></div>
-  );
-}
-
 function AiChatModal({ events, vitaminDone, onClose }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([
@@ -614,7 +650,6 @@ function AiChatModal({ events, vitaminDone, onClose }) {
               lineHeight: 1.5,
               direction: "rtl"
             }}>
-              {/* השימוש בפונקציה שלנו שממירה כוכביות להדגשות */}
               <div dangerouslySetInnerHTML={parseAiText(m.text)} />
             </div>
           ))}
@@ -676,7 +711,8 @@ const S = {
   nav: { position: "fixed", bottom: 0, left: 0, right: 0, display: "flex", background: "white", padding: "18px 25px 40px", borderTop: '1px solid #f1f5f9', boxShadow: '0 -5px 20px rgba(0,0,0,0.03)' },
   navBtn: (active) => ({ flex: 1, background: active ? C.peach : "none", border: "none", padding: "16px", borderRadius: "20px", fontWeight: 800, color: active ? "white" : C.textSoft, fontSize: 17 }),
   
-  aiFab: { position: "fixed", bottom: 110, left: 20, background: "transparent", border: "none", fontSize: 48, zIndex: 999, cursor: "pointer", filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" },
+  aiFab: { position: "fixed", bottom: 100, right: 20, background: "white", color: C.peachDark, border: `2px solid ${C.peach}`, fontSize: 32, width: 65, height: 65, borderRadius: 35, zIndex: 999, cursor: "pointer", boxShadow: "0 4px 15px rgba(0,0,0,0.15)", display: "flex", alignItems: "center", justifyContent: "center" },
+  handoffFab: { position: "fixed", bottom: 100, left: 20, background: C.peach, color: "white", border: "none", fontSize: 32, width: 65, height: 65, borderRadius: 35, zIndex: 999, cursor: "pointer", boxShadow: "0 4px 15px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center" },
   
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 },
   modal: { background: "white", padding: "35px", borderRadius: "40px", width: "100%" },
