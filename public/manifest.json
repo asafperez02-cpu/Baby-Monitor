@@ -7,9 +7,9 @@
   "theme_color": "#f4a58a",
   "icons": [
     {
-      "src": "alma.png?v=2",
-      "sizes": "512x512",
-      "type": "image/png",
+      "src": "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><circle cx=%2250%22 cy=%2250%22 r=%2240%22 fill=%22%23fff7ed%22/><circle cx=%2250%22 cy=%2255%22 r=%2230%22 stroke=%22%23e8845e%22 stroke-width=%226%22 fill=%22%23fff7ed%22/><circle cx=%2225%22 cy=%2230%22 r=%2212%22 stroke=%22%23e8845e%22 stroke-width=%226%22 fill=%22%23fff7ed%22/><circle cx=%2275%22 cy=%2230%22 r=%2212%22 stroke=%22%23e8845e%22 stroke-width=%226%22 fill=%22%23fff7ed%22/><path d=%22M50 45V55L58 62%22 stroke=%22%23e8845e%22 stroke-width=%226%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]
