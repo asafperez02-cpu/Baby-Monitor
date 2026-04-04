@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   collection, addDoc, deleteDoc, doc, updateDoc,
-  onSnapshot, query, orderBy, setDoc
+  onSnapshot, query, orderBy
 } from "firebase/firestore";
 import { db } from "./firebase";
 
@@ -47,7 +47,6 @@ function getTimeGap(ts1, ts2) {
 // ── Main App ───────────────────────────────────────────────────────────────
 export default function BabyApp() {
   const [events, setEvents] = useState([]);
-  const [vitaminDone, setVitaminDone] = useState(false);
   const [tab, setTab] = useState("home");
   const [userName] = useState(() => localStorage.getItem("baby_username") || "אבא");
   const [modal, setModal] = useState(null);
@@ -59,10 +58,7 @@ export default function BabyApp() {
     const timer = setInterval(() => setNow(Date.now()), 60000);
     const qEvents = query(collection(db, "events"), orderBy("ts", "desc"));
     const unsub = onSnapshot(qEvents, s => setEvents(s.docs.map(d => ({ id: d.id, ...d.data() }))));
-    const unsubVit = onSnapshot(doc(db, "settings", "vitaminD"), d => {
-      setVitaminDone(d.exists() && d.data().lastDate === new Date().toDateString());
-    });
-    return () => { clearInterval(timer); unsub(); unsubVit(); };
+    return () => { clearInterval(timer); unsub(); };
   }, []);
 
   const addEvent = async (ev) => {
@@ -77,6 +73,9 @@ export default function BabyApp() {
     setUndoId(docRef.id); setShowUndo(true);
     setTimeout(() => setShowUndo(false), 5000);
   };
+
+  // בדיקה האם כבר נרשם אירוע ויטמין D היום
+  const vitaminDone = events.some(e => e.type === "vitaminD" && isToday(e.ts));
 
   return (
     <div style={S.app}>
@@ -100,7 +99,7 @@ export default function BabyApp() {
         
         {!vitaminDone && (
           <div style={{...S.vitaminBar, background: (new Date(now).getHours() < 12 ? C.success : C.warning)}} onClick={() => {
-            setDoc(doc(db, "settings", "vitaminD"), { lastDate: new Date().toDateString() });
+            addEvent({ type: "vitaminD" });
           }}>
             <span>☀️ ויטמין D לעלמה</span>
             <input type="checkbox" readOnly checked={false} style={{transform:'scale(1.2)'}} />
@@ -125,13 +124,13 @@ export default function BabyApp() {
       {modal === "feed" && <FeedModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "diaper" && <DiaperModal onConfirm={addEvent} onClose={() => setModal(null)} />}
       {modal === "forecast" && <ForecastModal events={events} onClose={() => setModal(null)} />}
-      {modal === "ai" && <AiChatModal events={events} vitaminDone={vitaminDone} onClose={() => setModal(null)} />}
+      {modal === "ai" && <AiChatModal events={events} onClose={() => setModal(null)} />}
     </div>
   );
 }
 
 // ── AI Chat Component (Expert Data Edition) ──────────────────────────────
-function AiChatModal({ events, vitaminDone, onClose }) {
+function AiChatModal({ events, onClose }) {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState([
     { role: "ai", text: "היי! אני כאן לעזור. אני מקבלת אלי עכשיו את כל הנתונים של עלמה ברקע. איזה ניתוח נתונים, סיכום, או שאלה תרצה שנעבור עליה?" }
@@ -151,12 +150,10 @@ function AiChatModal({ events, vitaminDone, onClose }) {
     setLoading(true);
 
     try {
-      // אוספים נתונים של שבועיים אחורה במבנה JSON מסודר לטובת ניתוח מתקדם
       const twoWeeksAgo = Date.now() - 14 * 24 * 60 * 60 * 1000;
       const recentEvents = events.filter(e => e.ts > twoWeeksAgo).sort((a,b) => a.ts - b.ts);
       
       const structuredData = {
-        vitaminD_given_today: vitaminDone,
         events: recentEvents.map(e => {
           const d = new Date(e.ts);
           const base = { 
@@ -167,6 +164,7 @@ function AiChatModal({ events, vitaminDone, onClose }) {
           
           if (e.type === "feed") return { ...base, type: "feed", ml: Number(e.ml || 0) };
           if (e.type === "diaper") return { ...base, type: "diaper", pee: e.pee, poop: e.poop };
+          if (e.type === "vitaminD") return { ...base, type: "vitaminD" }; // הוספנו את יכולת הקריאה של ויטמין D ל-AI
           return null;
         }).filter(Boolean)
       };
