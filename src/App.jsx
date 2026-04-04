@@ -88,15 +88,13 @@ export default function BabyApp() {
     setTimeout(() => setShowUndo(false), 5000);
   };
 
-  // בדיקת אירועים יומיים (מתאפס אוטומטית כי isToday בודק תאריך נוכחי)
   const vitaminDone = events.some(e => e.type === "vitaminD" && isToday(e.ts));
   const bathDone = events.some(e => e.type === "bath" && isToday(e.ts));
 
-  // חישוב צבע הויטמין לפי השעה (הופך דחוף יותר לקראת חצות)
   const currentHour = new Date(now).getHours();
-  let vitColor = '#dcfce7'; // ירוק פסטל עד 12:00
-  if (currentHour >= 12 && currentHour < 18) vitColor = '#fef08a'; // צהוב פסטל עד 18:00
-  if (currentHour >= 18) vitColor = '#fecaca'; // אדום פסטל בערב
+  let vitColor = '#dcfce7'; 
+  if (currentHour >= 12 && currentHour < 18) vitColor = '#fef08a'; 
+  if (currentHour >= 18) vitColor = '#fecaca'; 
 
   return (
     <div style={S.app}>
@@ -132,7 +130,6 @@ export default function BabyApp() {
         
         <NetaTicker now={now} />
 
-        {/* משימות יומיות עם עיצוב הפסטל המשתנה */}
         <div style={{display: 'flex', gap: 10, marginBottom: 12}}>
           <TaskButton 
             icon="☀️" 
@@ -146,7 +143,7 @@ export default function BabyApp() {
             icon="🛁" 
             text="מקלחת" 
             done={bathDone} 
-            bgColor="#e0f2fe" // תכלת פסטל קבוע
+            bgColor="#e0f2fe"
             textColor="#075985"
             onClick={() => !bathDone && addEvent({ type: "bath" })} 
           />
@@ -201,7 +198,6 @@ function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
         </div>
       </div>
       
-      {/* Checkbox Circle */}
       <div style={{
         width: 22, height: 22, borderRadius: '50%', 
         border: done ? 'none' : `2px solid rgba(0,0,0,0.15)`, 
@@ -215,7 +211,7 @@ function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
 }
 
 
-// ── Neta Cheeky Compliment Ticker (150 Masterpieces) ──────────────────────
+// ── Neta Cheeky Compliment Ticker (150 Masterpieces - Fixed Quotes) ────────
 function NetaTicker({ now }) {
   const [manualOffset, setManualOffset] = useState(0);
 
@@ -255,7 +251,7 @@ function NetaTicker({ now }) {
     "נטע, כמות החן והסטייל שלך פשוט לא חוקית בעליל.",
     "נטע, את ההוכחה המדעית לכך שקסמים קיימים.",
     "נטע, מי צריכה שעות שינה כשאת נראית ככה טבעי?",
-    "נטע, תזכורת: הכלים בכיור יכולים לחכות. השנ"צ שלך לא.",
+    "נטע, תזכורת: הכלים בכיור יכולים לחכות. השנ״צ שלך לא.", // תוקן לגרשיים עבריים
     "נטע, את התיבול הכי שווה בחיים של אסף (יותר מהראב של הבשר).",
     "נטע, אפילו כשהקפה שלך התקרר ממזמן, את עדיין רותחת.",
     "נטע, את הכוח המניע של הרכבת הזו. בלי יחסי ציבור, פשוט עובדות.",
@@ -329,7 +325,7 @@ function NetaTicker({ now }) {
     "נטע, אני רואה את זמני ההאכלות. אין דברים כמוך בעולם המסירות.",
     "נטע, נראה לי שחסרים לך איזה 80 אחוזי סוללה בגוף. לכי לישון!",
     "נטע, החיים שלך הם כמו סדרה בנטפליקס, ואת הכוכבת הראשית.",
-    "נטע, אסף חשב שהוא מביא לי הוראות. אני מקשיב רק לך. מה הלו"ז?",
+    "נטע, אסף חשב שהוא מביא לי הוראות. אני מקשיב רק לך. מה הלו״ז?", // תוקן לגרשיים עבריים
     "נטע, השלווה שלך (גם אם היא מזויפת כרגע) פשוט מעוררת השראה.",
     "נטע, בואי נסגור שעכשיו התור של אסף. לכי לראות טלוויזיה.",
     "נטע, תסתכלי על שני הילדים המדהימים האלה. את יצרת את זה. בום.",
@@ -359,7 +355,7 @@ function NetaTicker({ now }) {
     "נטע, נשימה עמוקה. הלילה הזה יעבור, והשמש תזרח. את שפיצית.",
     "נטע, את השילוב המושלם בין גלאם של אינסטגרם למציאות חותכת.",
     "נטע, לראות אותך מתפקדת זה כמו לראות את מכבי תל אביב זוכה ביורוליג.",
-    "נטע, עלמה ברת מזל שזו הפרצוף הראשון שהיא רואה בבוקר.",
+    "נטע, עלמה ברת מזל שזה הפרצוף הראשון שהיא רואה בבוקר.",
     "נטע, בואי נרים כוסית של חלב שאוב לכבוד היותך האמא הכי קולית בארץ.",
     "נטע, גם כשאת עצבנית על אסף, את עושה את זה באלגנטיות.",
     "נטע, התעייפתי רק מלחשב את כמות הפעולות שאת עושה בשעה. סייבורג.",
@@ -369,7 +365,6 @@ function NetaTicker({ now }) {
     "נטע, לסיום: אל תתני לאף אחד, אפילו לא לאסף, להגיד לך אחרת. את מלכה."
   ];
   
-  // מתחלף כל שעה. הלחיצה הכפולה מתקדמת במערך!
   const baseIndex = Math.floor(now / (1000 * 60 * 60)) % compliments.length;
   const currentIndex = (baseIndex + manualOffset) % compliments.length;
   const current = compliments[currentIndex];
@@ -488,20 +483,16 @@ function ForecastModal({ events, onClose }) {
   let target = new Date(currentTs);
   target.setHours(23, 15, 0, 0);
   if (target.getTime() <= currentTs) {
-      target.setDate(target.getDate() + 1); // אם עברנו את חצות/23:15, מכוונים ל-23:15 של מחר
+      target.setDate(target.getDate() + 1);
   }
   
   let diffMs = target.getTime() - currentTs;
   
-  // אנחנו מניחים בסיס של כ-7 ארוחות ביום, מה שאומר מרווח ממוצע אידיאלי של כ-3.5 שעות בין האכלות
-  // נבדוק כמה ארוחות ניתן להכניס ברווח הזמן שנותר עד 23:15, בתנאי ששום מרווח לא יעלה על 4 שעות.
   let steps = Math.ceil(diffMs / (4 * 60 * 60 * 1000));
   if (steps === 0) steps = 1;
   
-  // מחלקים את הזמן לחלקים שווים כדי לנחות בול!
   let interval = diffMs / steps;
   
-  // מייצרים את התחזית לארוחות הבאות
   let tempTs = currentTs;
   for (let i = 0; i < 4; i++) {
     tempTs += interval;
