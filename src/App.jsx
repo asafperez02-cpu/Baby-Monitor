@@ -77,9 +77,8 @@ export default function BabyApp() {
 
   const addEvent = async (ev) => {
     if ("vibrate" in navigator) navigator.vibrate(40);
-    // שימוש בזמן ייעודי מהעוזרת החכמה, או זמן נוכחי/ידני
     let finalTs = ev.ts_override || Date.now(); 
-    delete ev.ts_override; // ניקוי השדה לפני שמירה למסד
+    delete ev.ts_override; 
 
     if (ev.manualTime && !ev.ts_override) {
       const [h, m] = ev.manualTime.split(':');
@@ -125,7 +124,6 @@ export default function BabyApp() {
         </div>
       )}
 
-      {/* Header */}
       <div style={S.headerContainer}>
         <div style={{display: 'flex', justifyContent: 'center', alignItems: 'baseline', gap: 8, marginBottom: 10}}>
           <div style={S.greeting}>שלום {userName} 👋</div>
@@ -180,7 +178,7 @@ export default function BabyApp() {
   );
 }
 
-// ── Smart Log Modal (הזנה קולית / הקלדה חופשית) ───────────────────────────
+// ── Smart Log Modal (הזנה קולית / טקסט חופשי) ─────────────────────────────
 function SmartLogModal({ onConfirm, onClose }) {
   const [text, setText] = useState("");
   const [listening, setListening] = useState(false);
@@ -229,7 +227,6 @@ function SmartLogModal({ onConfirm, onClose }) {
         return;
       }
 
-      // הרכבת האירוע למסד הנתונים
       const exactTs = Date.now() - ((data.minutesAgo || 0) * 60000);
       const eventToSave = { type: data.type, ts_override: exactTs };
       
@@ -252,7 +249,7 @@ function SmartLogModal({ onConfirm, onClose }) {
       <div style={{...S.modal, textAlign: 'center'}} onClick={e=>e.stopPropagation()}>
         <h3 className="kids-font" style={{color: C.peachDark, margin: '0 0 20px', fontSize: 24}}>הזנה חכמה 🎙️</h3>
         <p style={{fontSize: 14, color: C.textSoft, marginBottom: 20}}>
-          לחץ על המיקרופון ודבר, או פשוט הקלד. <br/>למשל: "עלמה אכלה 60 מיל ב-10 בבוקר" או "החלפנו לה קקי לפני רבע שעה".
+          לחץ על המיקרופון ודבר, או פשוט הקלד. <br/>למשל: "עלמה אכלה 60 מיל ב-10 בבוקר" או "החלפנו קקי לפני רבע שעה".
         </p>
 
         <div style={{display: 'flex', justifyContent: 'center', marginBottom: 20}}>
@@ -287,7 +284,6 @@ function SmartLogModal({ onConfirm, onClose }) {
   );
 }
 
-// ── Elegant Task Button Component ─────────────────────────────────────────
 function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   return (
     <button 
@@ -322,7 +318,6 @@ function TaskButton({ icon, text, done, bgColor, textColor, onClick }) {
   );
 }
 
-// ── Neta Cheeky Compliment Ticker ──────────────────────────────────────────
 function NetaTicker({ now }) {
   const [manualOffset, setManualOffset] = useState(0);
 
@@ -493,7 +488,6 @@ function NetaTicker({ now }) {
   );
 }
 
-// ── Proactive Ticker (התובנות של עלמה) ────────────────────────────────────
 function ProactiveTicker({ events, vitaminDone, now }) {
   const [index, setIndex] = useState(0);
   const insights = [];
@@ -543,8 +537,6 @@ function ProactiveTicker({ events, vitaminDone, now }) {
   );
 }
 
-// ── Components ──────────────────────────────────────────────────────────────
-
 function MainTimerWidget({ events, now, onOpenForecast }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return <div style={S.mainWidget}><div className="kids-font" style={{fontSize: 42, color: 'white'}}>--</div></div>;
@@ -578,19 +570,15 @@ function MainTimerWidget({ events, now, onOpenForecast }) {
   );
 }
 
-// ── Smart Night Forecast Modal (יעד יחיד: 23:15, 7 ארוחות ביום) ────────────
 function ForecastModal({ events, onClose }) {
   const lastFeed = events.find(e => e.type === "feed");
   if (!lastFeed) return null;
   
-  // טור ימין: מרווח קשיח של בדיוק 4 שעות רגיל
   const dumbFuture = Array.from({length: 4}).map((_, i) => new Date(lastFeed.ts + (i + 1) * 4 * 60 * 60 * 1000));
   
-  // טור שמאל: אלגוריתם חכם - יעד סופי ומוחלט הוא 23:15.
   const smartFuture = [];
   let currentTs = lastFeed.ts;
 
-  // חישוב היעד: 23:15 הבא
   let target = new Date(currentTs);
   target.setHours(23, 15, 0, 0);
   if (target.getTime() <= currentTs) {
@@ -616,7 +604,6 @@ function ForecastModal({ events, onClose }) {
         <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, margin: '0 0 20px', fontSize: 22}}>הטייס האוטומטי 🌙</h3>
         
         <div style={{display: 'flex', gap: 10, marginBottom: 20}}>
-          {/* עמודה ימנית (קשיחה) */}
           <div style={{flex: 1, background: '#f8fafc', padding: 10, borderRadius: 15, border: '1px solid #e2e8f0'}}>
             <div style={{fontWeight: 800, fontSize: 13, color: C.textSoft, textAlign: 'center', marginBottom: 15, height: 35}}>
               מרווח קשיח<br/>(כל 4 שעות)
@@ -628,7 +615,6 @@ function ForecastModal({ events, onClose }) {
             ))}
           </div>
 
-          {/* עמודה שמאלית (התיקון החכם) */}
           <div style={{flex: 1, background: '#ecfdf5', padding: 10, borderRadius: 15, border: '1px solid #a7f3d0'}}>
             <div style={{fontWeight: 900, fontSize: 13, color: C.success, textAlign: 'center', marginBottom: 15, height: 35}}>
               התיקון המומלץ<br/>(יעד סופי: 23:15)
@@ -652,10 +638,10 @@ function ForecastModal({ events, onClose }) {
   );
 }
 
-// ── Shift Handoff Modal (תקציר משמרת) ─────────────────────────────────────
+// ── Shift Handoff Modal (משמרת של 4 שעות עם תובנות אקטיביות) ──────────────
 function HandoffModal({ events, vitaminDone, bathDone, onClose }) {
   const now = Date.now();
-  const shiftHours = 6;
+  const shiftHours = 4; // שונה מ-6 ל-4 לבקשתך
   const shiftMs = shiftHours * 60 * 60 * 1000;
   const shiftEvents = events.filter(e => (now - e.ts) < shiftMs);
 
@@ -668,6 +654,18 @@ function HandoffModal({ events, vitaminDone, bathDone, onClose }) {
   const poopCount = diapers.filter(e => e.poop).length;
   
   const bathDoneShift = shiftEvents.some(e => e.type === "bath");
+
+  // יצירת רשימת ה-3 תובנות האקטיביות
+  let todos = [];
+  if (peeCount === 0) todos.push("לא הוחלף פיפי במשמרת הקודמת - לבדוק חיתול בהקדם.");
+  if (poopCount === 0) todos.push("לא היה קקי ב-4 השעות האחרונות - לשים לב בהחתלות.");
+  if (totalMl < 60) todos.push(`אכלה מעט יחסית (${totalMl} מ"ל) במשמרת - להקפיד על האכלה.`);
+  if (!vitaminDone) todos.push("לא לשכוח לתת ויטמין D (עדיין לא סומן היום).");
+  if (lastFeed) todos.push(`יעד משוער להאכלה הבאה: סביב ${fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.`);
+
+  // חותכים לעד 3 תובנות מרכזיות
+  todos = todos.slice(0, 3);
+  if (todos.length === 0) todos.push("הכל נראה מצוין! משמרת נעימה.");
 
   return (
     <div style={S.overlay} onClick={onClose}>
@@ -714,11 +712,11 @@ function HandoffModal({ events, vitaminDone, bathDone, onClose }) {
           </div>
 
           <div style={{marginBottom: 20}}>
-            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>💡 תובנות ודגשים</h4>
+            <h4 style={{color: C.warning, margin: '0 0 10px', fontSize: 18}}>🎯 לוודא במשמרת</h4>
             <ul style={{margin: 0, paddingRight: 20, fontWeight: 700, color: C.textSoft, lineHeight: 1.6}}>
-              {poopCount === 0 && <li style={{color: C.danger}}>לא היה קקי במשמרת הזו, לשים לב!</li>}
-              {!vitaminDone && <li>לא לשכוח לתת ויטמין D.</li>}
-              {lastFeed && <li><strong style={{color:C.peachDark}}>יעד משוער להאכלה הבאה:</strong> סביב {fmtTime(lastFeed.ts + 4 * 60 * 60 * 1000)}.</li>}
+              {todos.map((todo, idx) => (
+                <li key={idx} style={{marginBottom: 4}}>{todo}</li>
+              ))}
             </ul>
           </div>
 
@@ -905,6 +903,7 @@ function AnalyticsView({ events }) {
   );
 }
 
+// ── Feed Modal (שדה בחירה חכמה) ──────────────────────────────────────────
 function FeedModal({ onConfirm, onClose }) {
   const [ml, setMl] = useState("");
   const [timeMode, setTimeMode] = useState("now");
@@ -913,25 +912,22 @@ function FeedModal({ onConfirm, onClose }) {
     <div style={S.overlay} onClick={onClose}><div style={S.modal} onClick={e=>e.stopPropagation()}>
       <h3 className="kids-font" style={{textAlign:'center', color:C.peachDark, marginBottom: 15}}>האכלה 🍼</h3>
       
-      {/* כפתור הטורבו החדש */}
-      <div style={{marginBottom: 20}}>
-        <button 
-          onClick={()=>{onConfirm({type:'feed', ml:60, manualTime: null}); onClose();}} 
-          style={{...S.primaryBtn, background: C.success, padding: '15px'}}
-        >
-          ⚡ מנת 60 מ"ל עכשיו!
-        </button>
+      <div style={{textAlign: 'center', color: '#cbd5e1', marginBottom: 10, fontSize: 14}}>בחירה מהירה:</div>
+      <div style={{display:'flex', gap:10, marginBottom:20}}>
+        <button onClick={()=>setMl("60")} style={S.chip(ml==="60")}>60 מ"ל</button>
+        <button onClick={()=>setMl("90")} style={S.chip(ml==="90")}>90 מ"ל</button>
+        <button onClick={()=>setMl("120")} style={S.chip(ml==="120")}>120 מ"ל</button>
       </div>
-
-      <div style={{textAlign: 'center', color: '#cbd5e1', marginBottom: 15, fontSize: 14}}>או הקלדה ידנית:</div>
 
       <div style={{display:'flex', gap:10, marginBottom:20}}>
         <button onClick={()=>setTimeMode("now")} style={S.chip(timeMode==="now")}>עכשיו</button>
         <button onClick={()=>setTimeMode("manual")} style={S.chip(timeMode==="manual")}>זמן אחר</button>
       </div>
       {timeMode === "manual" && <input type="time" value={manualTime} onChange={e=>setManualTime(e.target.value)} style={S.input} />}
-      <input type="number" placeholder='כמות מ"ל' value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
-      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime: timeMode==='manual'?manualTime:null}); onClose();}} style={S.primaryBtn}>שמור מנה</button>
+      
+      <input type="number" placeholder='הקלד כמות מ"ל חופשית' value={ml} onChange={e=>setMl(e.target.value)} style={S.input} />
+      
+      <button onClick={()=>{onConfirm({type:'feed', ml, manualTime: timeMode==='manual'?manualTime:null}); onClose();}} style={S.primaryBtn}>שמור</button>
     </div></div>
   );
 }
